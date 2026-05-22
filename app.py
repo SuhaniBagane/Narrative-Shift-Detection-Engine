@@ -626,28 +626,77 @@ with tab_narrative:
     
     # C. Dynamic Live Headlines Stream Table
     st.markdown("#### 🚨 Captured Financial News Streams")
-    st.markdown("The underlying dynamic stream of headlines ingested by the system. Use the sidebar controls to alter this stream.")
     
-    grid_data = []
-    for h in st.session_state.active_headlines_data:
-        grid_data.append({
-            "Timestamp": datetime.datetime.now().strftime("%H:%M"),
-            "Financial News Headline": h["raw"],
-            "VADER Sentiment": h["vader"]["Sentiment Label"],
-            "ML LogReg Sentiment": h["lr"]["Sentiment Label"]
-        })
-    df_grid = pd.DataFrame(grid_data)
+    stream_tab_active, stream_tab_all = st.tabs([
+        "🌌 Active Captured Stream (Simulation)", 
+        "📂 Entire Labeled News Corpus (Kaggle Dataset)"
+    ])
     
-    def color_sentiment(val):
-        if val == 'Positive':
-            return 'background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold; border-left: 3px solid #10b981;'
-        elif val == 'Negative':
-            return 'background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: bold; border-left: 3px solid #ef4444;'
-        else:
-            return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
+    with stream_tab_active:
+        st.markdown("The underlying dynamic stream of headlines ingested by the system. Use the sidebar controls to alter this stream.")
+        
+        grid_data = []
+        for h in st.session_state.active_headlines_data:
+            grid_data.append({
+                "Timestamp": datetime.datetime.now().strftime("%H:%M"),
+                "Financial News Headline": h["raw"],
+                "VADER Sentiment": h["vader"]["Sentiment Label"],
+                "ML LogReg Sentiment": h["lr"]["Sentiment Label"]
+            })
+        df_grid = pd.DataFrame(grid_data)
+        
+        def color_sentiment(val):
+            if val == 'Positive':
+                return 'background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold; border-left: 3px solid #10b981;'
+            elif val == 'Negative':
+                return 'background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: bold; border-left: 3px solid #ef4444;'
+            else:
+                return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
+                
+        styled_grid = df_grid.style.map(color_sentiment, subset=['VADER Sentiment', 'ML LogReg Sentiment'])
+        st.dataframe(styled_grid, use_container_width=True, height=290)
+        
+    with stream_tab_all:
+        st.markdown("Explore the full ingested sentiment analysis training dataset containing **5,902** headlines from Kaggle and custom project expansions.")
+        
+        # Build DataFrame of all headlines from data_loader.NEWS_POOL
+        all_headlines = []
+        for category, pool in data_loader.NEWS_POOL.items():
+            for text in pool:
+                all_headlines.append({
+                    "Headline Text": text,
+                    "Sentiment Label": category.capitalize()
+                })
+        df_all = pd.DataFrame(all_headlines)
+        
+        # Add search and filter controls
+        c1, c2 = st.columns([2, 1])
+        search_query = c1.text_input("Search Headlines:", placeholder="e.g., Apple, Nifty, inflation...", key="corpus_search")
+        sentiment_filter = c2.selectbox(
+            "Filter by Sentiment:", 
+            options=["All", "Positive", "Negative", "Neutral", "Panic"],
+            key="corpus_sentiment_filter"
+        )
+        
+        # Filter logic
+        df_filtered = df_all
+        if sentiment_filter != "All":
+            df_filtered = df_filtered[df_filtered["Sentiment Label"] == sentiment_filter]
+        if search_query:
+            df_filtered = df_filtered[df_filtered["Headline Text"].str.contains(search_query, case=False, na=False)]
             
-    styled_grid = df_grid.style.map(color_sentiment, subset=['VADER Sentiment', 'ML LogReg Sentiment'])
-    st.dataframe(styled_grid, use_container_width=True, height=290)
+        st.markdown(f"Showing **{len(df_filtered):,}** matching headlines.")
+        
+        def color_label(val):
+            if val == 'Positive':
+                return 'background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold;'
+            elif val == 'Negative' or val == 'Panic':
+                return 'background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: bold;'
+            else:
+                return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
+                
+        styled_all = df_filtered.style.map(color_label, subset=['Sentiment Label'])
+        st.dataframe(styled_all, use_container_width=True, height=350)
 
 # ==========================================
 # TAB 2: NLP PIPELINE INSPECTOR & TF-IDF
@@ -813,13 +862,59 @@ with tab_ml:
         
     df_compare = pd.DataFrame(compare_rows)
     
-    # Apply stylings
-    def color_agree(row):
-        is_agree = row['VADER Label'] == row['ML Label']
-        color = 'background-color: rgba(16, 185, 129, 0.05); border-right: 2px solid #10b981;' if is_agree else 'background-color: rgba(239, 68, 68, 0.05); border-right: 2px solid #ef4444;'
-        return [color] * len(row)
-        
     st.dataframe(df_compare, use_container_width=True, height=270)
+
+    st.divider()
+    st.markdown("### 📊 Ingested Training Dataset Distribution")
+    st.markdown("Class distribution of the **5,902** financial news headlines loaded from the Kaggle dataset and custom project expansions.")
+    
+    dist_data = {
+        "Sentiment Label": ["Neutral", "Positive", "Negative", "Panic (Simulated)"],
+        "Headline Count": [
+            len(data_loader.NEWS_POOL["neutral"]),
+            len(data_loader.NEWS_POOL["positive"]),
+            len(data_loader.NEWS_POOL["negative"]),
+            len(data_loader.NEWS_POOL["panic"])
+        ]
+    }
+    df_dist = pd.DataFrame(dist_data)
+    
+    dist_col1, dist_col2 = st.columns(2)
+    with dist_col1:
+        fig_pie = px.pie(
+            df_dist, 
+            values="Headline Count", 
+            names="Sentiment Label",
+            color="Sentiment Label",
+            color_discrete_map={
+                "Neutral": "#94a3b8",
+                "Positive": "#10b981",
+                "Negative": "#ef4444",
+                "Panic (Simulated)": "#f97316"
+            },
+            hole=0.4
+        )
+        fig_pie.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#94a3b8"),
+            height=300,
+            margin=dict(l=20, r=20, t=10, b=20),
+            legend=dict(orientation="h", yanchor="bottom", y=-0.15, xanchor="center", x=0.5)
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+        
+    with dist_col2:
+        st.markdown("<div style='padding-top: 15px;'></div>", unsafe_allow_html=True)
+        st.markdown(f"""
+        - **Total Dataset Size:** `{sum(dist_data['Headline Count']):,}` headlines
+        - **Neutral Sentences:** `{dist_data['Headline Count'][0]:,}` (representing stable markets)
+        - **Positive Sentences:** `{dist_data['Headline Count'][1]:,}` (representing bullish indicators)
+        - **Negative Sentences:** `{dist_data['Headline Count'][2]:,}` (representing bearish indicators)
+        - **Panic-inducing Headlines:** `{dist_data['Headline Count'][3]:,}` (used for testing tail-risk state transitions)
+        
+        *Note: The ML model is continuously re-trained on this aggregated corpus, enabling it to map incoming financial text streams to these baseline distributions.*
+        """)
 
 # ==========================================
 # TAB 4: INTERACTIVE AI CHATBOT
