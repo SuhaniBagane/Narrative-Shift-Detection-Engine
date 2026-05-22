@@ -85,6 +85,24 @@ NEWS_POOL = {
     ]
 }
 
+# Dynamically extend NEWS_POOL with the Kaggle CSV dataset if available
+import os
+import pandas as pd
+csv_path = "data/sentiment_data.csv"
+if os.path.exists(csv_path):
+    try:
+        df = pd.read_csv(csv_path)
+        if 'Sentence' in df.columns and 'Sentiment' in df.columns:
+            df = df.dropna(subset=['Sentence', 'Sentiment'])
+            for _, row in df.iterrows():
+                sent = str(row['Sentiment']).strip().lower()
+                text = str(row['Sentence']).strip()
+                if sent in NEWS_POOL:
+                    if text not in NEWS_POOL[sent]:
+                        NEWS_POOL[sent].append(text)
+    except Exception as e:
+        print(f"Warning: Failed to load news pool CSV {csv_path}: {e}")
+
 def generate_headlines(bias="neutral", count=10):
     """
     Generates a batch of news headlines based on the current market narrative bias.

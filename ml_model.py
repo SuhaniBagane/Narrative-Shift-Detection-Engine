@@ -189,11 +189,27 @@ class FinancialSentimentClassifier:
         
     def train(self):
         """
-        Loads the training corpus, cleans text using the nlp_pipeline,
+        Loads the training corpus (including CSV dataset if available), cleans text using the nlp_pipeline,
         extracts TF-IDF features, and trains the Logistic Regression classifier.
         Saves accuracy and evaluation metrics.
         """
         corpus = get_expanded_training_corpus()
+        
+        # Load from CSV if it exists
+        import os
+        csv_path = "data/sentiment_data.csv"
+        if os.path.exists(csv_path):
+            try:
+                df = pd.read_csv(csv_path)
+                if 'Sentence' in df.columns and 'Sentiment' in df.columns:
+                    df = df.dropna(subset=['Sentence', 'Sentiment'])
+                    df['Sentiment'] = df['Sentiment'].str.strip().str.capitalize()
+                    # Filter valid labels
+                    df = df[df['Sentiment'].isin(['Positive', 'Negative', 'Neutral'])]
+                    csv_data = list(zip(df['Sentence'], df['Sentiment']))
+                    corpus.extend(csv_data)
+            except Exception as e:
+                print(f"Warning: Failed to load training CSV {csv_path}: {e}")
         
         # Preprocess all training texts
         cleaned_texts = [preprocess_text(text) for text, _ in corpus]
