@@ -159,3 +159,28 @@ def simulate_market_indices(sentiment_score, prev_nifty=22400.0, prev_sensex=738
     sensex_change = new_sensex - prev_sensex
     
     return round(new_nifty, 2), round(change_pct * 100, 2), round(new_sensex, 2), round(change_pct * 100, 2)
+
+def fetch_live_indices_yfinance():
+    """
+    Fetches actual real-time prices and daily change percentages
+    for Nifty 50 (^NSEI) and BSE Sensex (^BSESN) from Yahoo Finance.
+    Falls back to hardcoded default indices if connection fails.
+    """
+    import yfinance as yf
+    try:
+        nifty = yf.Ticker('^NSEI')
+        nifty_p = float(nifty.fast_info['last_price'])
+        nifty_pc = float(nifty.fast_info['previous_close'])
+        nifty_change = ((nifty_p - nifty_pc) / nifty_pc) * 100
+        
+        sensex = yf.Ticker('^BSESN')
+        sensex_p = float(sensex.fast_info['last_price'])
+        sensex_pc = float(sensex.fast_info['previous_close'])
+        sensex_change = ((sensex_p - sensex_pc) / sensex_pc) * 100
+        
+        return round(nifty_p, 2), round(nifty_change, 2), round(sensex_p, 2), round(sensex_change, 2)
+    except Exception as e:
+        print(f"Warning: Failed to fetch live Yahoo Finance data: {e}")
+        # Default fallback values
+        return 22420.00, 0.00, 73910.00, 0.00
+

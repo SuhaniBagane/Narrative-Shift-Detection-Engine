@@ -160,10 +160,11 @@ st.markdown("""
 # Initialize static parameters and caches if not set
 if "initialized" not in st.session_state:
     st.session_state.initialized = True
-    st.session_state.nifty_val = 22420.00
-    st.session_state.sensex_val = 73910.00
-    st.session_state.nifty_change = 0.00
-    st.session_state.sensex_change = 0.00
+    n_val, n_chg, s_val, s_chg = data_loader.fetch_live_indices_yfinance()
+    st.session_state.nifty_val = n_val
+    st.session_state.sensex_val = s_val
+    st.session_state.nifty_change = n_chg
+    st.session_state.sensex_change = s_chg
     
     # Pre-populate history with a standard realistic narrative arc
     now = datetime.datetime.now()
