@@ -203,9 +203,9 @@ if "initialized" not in st.session_state:
         ("bot", "👋 Welcome to **BuzzStreet Narrative Intelligence Assistant!**\n\nI can analyze raw financial texts, compute sentiment metrics using VADER and a trained **Logistic Regression classifier**, detect overall market narrative shifts, and answer questions. Try asking: \n\n*“What is current market sentiment?”* or *“Why is the market negative?”*")
     ]
     
-    st.session_state.active_page = "📈 Narrative Intelligence"
     st.session_state.voice_speak_text = ""
     st.session_state.last_heard_text = ""
+    st.session_state.active_tab_to_click = ""
     st.session_state.predict_ticker = "^NSEI"
     st.session_state.compare_tickers = ["^NSEI", "^BSESN"]
 
@@ -314,23 +314,23 @@ def process_voice_command(command_text):
     
     # 1. Navigation Commands
     if any(k in cmd for k in ["narrative", "intelligence", "shift", "home", "dashboard"]):
-        st.session_state.active_page = "📈 Narrative Intelligence"
+        st.session_state.active_tab_to_click = "Narrative Intelligence"
         st.session_state.voice_speak_text = "Opening Narrative Intelligence Dashboard."
         st.rerun()
     elif any(k in cmd for k in ["nlp", "preprocess", "clean", "token"]):
-        st.session_state.active_page = "🧠 NLP Preprocessing"
+        st.session_state.active_tab_to_click = "NLP Cleaning"
         st.session_state.voice_speak_text = "Showing NLP Preprocessing and TF-IDF Inspector."
         st.rerun()
     elif any(k in cmd for k in ["model", "cockpit", "training", "machine learning", "classifier"]):
-        st.session_state.active_page = "🤖 ML Training Cockpit"
+        st.session_state.active_tab_to_click = "ML Training"
         st.session_state.voice_speak_text = "Navigating to Machine Learning Classifier Performance."
         st.rerun()
     elif any(k in cmd for k in ["chatbot", "assistant", "chat", "ask bot"]):
-        st.session_state.active_page = "💬 AI Narrative Chatbot"
+        st.session_state.active_tab_to_click = "Chatbot"
         st.session_state.voice_speak_text = "Opening AI Narrative Chatbot."
         st.rerun()
     elif any(k in cmd for k in ["predict", "forecast", "future", "suggestion"]):
-        st.session_state.active_page = "🔮 Stock & Trade Predictor"
+        st.session_state.active_tab_to_click = "Predictor"
         st.session_state.voice_speak_text = "Opening Stock and Trade Future Predictor."
         
         # Check if the user specified a ticker to predict, e.g. "predict apple"
@@ -341,7 +341,7 @@ def process_voice_command(command_text):
                 break
         st.rerun()
     elif any(k in cmd for k in ["compare", "comparison", "side by side"]):
-        st.session_state.active_page = "📊 Multi-Asset Comparison"
+        st.session_state.active_tab_to_click = "Comparison"
         st.session_state.voice_speak_text = "Opening Multi-Asset Comparison Dashboard."
         
         # Check if they named companies to compare, e.g., "compare apple and tesla"
@@ -360,7 +360,7 @@ def process_voice_command(command_text):
         
     # 2. General Queries (Pass to Chatbot directly!)
     else:
-        st.session_state.active_page = "💬 AI Narrative Chatbot"
+        st.session_state.active_tab_to_click = "Chatbot"
         
         vaders_c = [h["vader"]["compound"] for h in st.session_state.active_headlines_data]
         lrs_c = [h["lr"] for h in st.session_state.active_headlines_data]
@@ -433,34 +433,18 @@ with st.sidebar:
     st.markdown('<div class="profile-role">Phase III: Advanced NLP & AI Predictor</div>', unsafe_allow_html=True)
     st.divider()
     
-    # Page selector dropdown/radio to enable navigation
-    pages = [
-        "📈 Narrative Intelligence", 
-        "🧠 NLP Preprocessing", 
-        "🤖 ML Training Cockpit", 
-        "💬 AI Narrative Chatbot",
-        "🔮 Stock & Trade Predictor",
-        "📊 Multi-Asset Comparison"
-    ]
-    st.markdown("### 🧭 Navigation Panel")
-    selected_page = st.selectbox(
-        "Active Workspace:",
-        options=pages,
-        index=pages.index(st.session_state.active_page)
-    )
-    st.session_state.active_page = selected_page
-    
-    st.divider()
     st.markdown("### 🎙️ Voice Assistant Control")
     
     # Render the custom voice assistant component
     heard_text = voice_assistant(
         key="voice_assistant_component", 
-        text_to_speak=st.session_state.voice_speak_text
+        text_to_speak=st.session_state.voice_speak_text,
+        active_tab_to_click=st.session_state.get("active_tab_to_click", "")
     )
     
-    # Reset voice speech parameter to prevent loop speech
+    # Reset voice control states to prevent loops
     st.session_state.voice_speak_text = ""
+    st.session_state.active_tab_to_click = ""
     
     if heard_text and heard_text != st.session_state.last_heard_text:
         st.session_state.last_heard_text = heard_text
@@ -532,10 +516,16 @@ st.markdown('<span class="milestone-badge">Phase II Milestone (50% Completion Re
 # ----------------------------------------------------
 # TABULAR LAYOUT FOR COCKPIT SECTIONS
 # ----------------------------------------------------
-# ==========================================
-# PAGE ROUTER
-# ==========================================
-if st.session_state.active_page == "📈 Narrative Intelligence":
+tab_narrative, tab_nlp, tab_ml, tab_chatbot, tab_predict, tab_compare = st.tabs([
+    "📈 Narrative Intelligence", 
+    "🧠 NLP Cleaning & TF-IDF", 
+    "🤖 ML Training Cockpit", 
+    "💬 AI Narrative Chatbot",
+    "🔮 Stock & Trade Predictor",
+    "📊 Multi-Asset Comparison"
+])
+
+with tab_narrative:
     # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
     st.markdown("### 📊 Market Atmosphere & Indexes")
     
@@ -826,7 +816,7 @@ if st.session_state.active_page == "📈 Narrative Intelligence":
 # ==========================================
 # TAB 2: NLP PIPELINE INSPECTOR & TF-IDF
 # ==========================================
-elif st.session_state.active_page == "🧠 NLP Preprocessing":
+with tab_nlp:
     st.markdown("### 🔬 NLP Preprocessing Pipeline Inspector")
     st.markdown("Select any active headline to observe the step-by-step mathematical and grammatical cleaning transitions.")
     
@@ -908,7 +898,7 @@ elif st.session_state.active_page == "🧠 NLP Preprocessing":
 # ==========================================
 # TAB 3: MACHINE LEARNING COCKPIT
 # ==========================================
-elif st.session_state.active_page == "🤖 ML Training Cockpit":
+with tab_ml:
     st.markdown("### 🤖 Supervised Classifier Performance")
     st.markdown("Evaluate the mathematical models comparing VADER (lexical-lexicon method) vs Logistic Regression (supervised statistical method).")
     
@@ -1044,7 +1034,7 @@ elif st.session_state.active_page == "🤖 ML Training Cockpit":
 # ==========================================
 # TAB 4: INTERACTIVE AI CHATBOT
 # ==========================================
-elif st.session_state.active_page == "💬 AI Narrative Chatbot":
+with tab_chatbot:
     st.markdown("### 💬 AI Narrative Shift Assistant")
     st.markdown("An interactive AI bot designed to explain current market sentiment, transition anomalies, and textual pipeline details dynamically.")
     
@@ -1077,7 +1067,7 @@ elif st.session_state.active_page == "💬 AI Narrative Chatbot":
         process_chat_query(user_query)
         st.rerun()
 
-elif st.session_state.active_page == "🔮 Stock & Trade Predictor":
+with tab_predict:
     st.markdown("### 🔮 Stock & Trade Future Predictor")
     st.markdown("Forecast future asset valuations and evaluate technical trade recommendations based on quantitative indicator synthesis.")
     
@@ -1296,7 +1286,7 @@ elif st.session_state.active_page == "🔮 Stock & Trade Predictor":
     else:
         st.warning("No data found for this asset. Please verify the ticker prefix.")
 
-elif st.session_state.active_page == "📊 Multi-Asset Comparison":
+with tab_compare:
     st.markdown("### 📊 Multi-Asset Comparative Charting")
     st.markdown("Compare the relative performance of multiple assets side-by-side or overlaid, normalized to a base starting price index.")
     

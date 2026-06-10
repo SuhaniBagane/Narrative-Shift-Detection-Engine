@@ -141,29 +141,51 @@
       };
     }
 
+    // Tab switching helper
+    function clickTabByName(tabName) {
+      try {
+        const parentDoc = window.parent.document;
+        const tabs = parentDoc.querySelectorAll('button[role="tab"], button[data-baseweb="tab"]');
+        for (let tab of tabs) {
+          if (tab.textContent.toLowerCase().includes(tabName.toLowerCase())) {
+            tab.click();
+            return true;
+          }
+        }
+      } catch(e) {
+        console.error("Failed to click tab:", e);
+      }
+      return false;
+    }
+
     // Listen to messages from Streamlit python backend
     window.addEventListener("message", (event) => {
       // Check for render events
       if (event.data.type === "streamlit:render") {
         const args = event.data.args;
-        if (args && args.text_to_speak) {
-          const text = args.text_to_speak;
-          // Only speak if SpeechSynthesis is supported and not already speaking the exact same text
-          if (SpeechSynthesis && !SpeechSynthesis.speaking) {
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.rate = 1.0;
-            utterance.pitch = 1.0;
-            
-            // Temporary change status text to speaking
-            const originalStatusText = status.innerText;
-            status.innerText = "Speaking...";
-            
-            utterance.onend = () => {
-              status.innerText = "Voice Standby";
-            };
-            
-            SpeechSynthesis.cancel(); // cancel any active utterances
-            SpeechSynthesis.speak(utterance);
+        if (args) {
+          if (args.text_to_speak) {
+            const text = args.text_to_speak;
+            if (SpeechSynthesis && !SpeechSynthesis.speaking) {
+              const utterance = new SpeechSynthesisUtterance(text);
+              utterance.rate = 1.0;
+              utterance.pitch = 1.0;
+              
+              const originalStatusText = status.innerText;
+              status.innerText = "Speaking...";
+              
+              utterance.onend = () => {
+                status.innerText = "Voice Standby";
+              };
+              
+              SpeechSynthesis.cancel();
+              SpeechSynthesis.speak(utterance);
+            }
+          }
+          if (args.active_tab_to_click) {
+            setTimeout(() => {
+              clickTabByName(args.active_tab_to_click);
+            }, 150);
           }
         }
       }
