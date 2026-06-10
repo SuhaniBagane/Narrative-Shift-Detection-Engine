@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Voice Assistant</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: transparent;
+      overflow: hidden;
+    }
+    .mic-btn {
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 54px;
+      height: 54px;
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+      transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      outline: none;
+    }
+    .mic-btn:hover {
+      transform: scale(1.08);
+      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.6);
+    }
+    .mic-btn.listening {
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 0 15px #ef4444;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: 'Inter', -apple-system, sans-serif;
+      color: #e2e8f0;
+      gap: 6px;
+      padding: 5px;
+    }
+    .status-text {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: center;
+      max-width: 140px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <button class="mic-btn" id="micBtn">🎙️</button>
+    <div class="status-text" id="status">Voice Standby</div>
+  </div>
+
+  <script>
+    // Streamlit Component SDK messaging helper
+    function sendValueToStreamlit(value) {
+      const message = {
+        isstreamlitmessage: true,
+        type: "streamlit:setComponentValue",
+        value: value
+      };
+      window.parent.postMessage(message, "*");
+    }
+
+    // Setup Speech Recognition
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const SpeechSynthesis = window.speechSynthesis;
+    
+    const micBtn = document.getElementById('micBtn');
+    const status = document.getElementById('status');
+    let isListening = false;
+    let recognition = null;
+
+    if (!SpeechRecognition) {
+      status.innerText = "Unsupported Browser";
+      micBtn.disabled = true;
+      micBtn.style.opacity = "0.5";
+      micBtn.style.cursor = "not-allowed";
+    } else {
+      recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      micBtn.addEventListener('click', () => {
+        if (isListening) {
+          recognition.stop();
+        } else {
+          try {
+            recognition.start();
+          } catch(e) {
+            console.error("Start failed:", e);
+          }
+        }
+      });
+
+      recognition.onstart = () => {
+        isListening = true;
+        micBtn.classList.add('listening');
+        status.innerText = "Listening...";
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        micBtn.classList.remove('listening');
+        if (status.innerText === "Listening...") {
+          status.innerText = "Voice Standby";
+        }
+      };
+
+      recognition.onerror = (event) => {
+        console.error("Speech Recognition Error:", event.error);
+        status.innerText = "Retry Voice";
+        isListening = false;
+        micBtn.classList.remove('listening');
+      };
+
+      recognition.onresult = (event) => {
+        const resultText = event.results[0][0].transcript;
+        status.innerText = "Heard: " + resultText;
+        sendValueToStreamlit(resultText);
+      };
+    }
+
+    // Listen to messages from Streamlit python backend
+    window.addEventListener("message", (event) => {
+      // Check for render events
+      if (event.data.type === "streamlit:render") {
+        const args = event.data.args;
+        if (args && args.text_to_speak) {
+          const text = args.text_to_speak;
+          // Only speak if SpeechSynthesis is supported and not already speaking the exact same text
+          if (SpeechSynthesis && !SpeechSynthesis.speaking) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            
+            // Temporary change status text to speaking
+            const originalStatusText = status.innerText;
+            status.innerText = "Speaking...";
+            
+            utterance.onend = () => {
+              status.innerText = "Voice Standby";
+            };
+            
+            SpeechSynthesis.cancel(); // cancel any active utterances
+            SpeechSynthesis.speak(utterance);
+          }
+        }
+      }
+    });
+
+    // Notify Streamlit that the component is loaded and ready
+    const readyMessage = {
+      isstreamlitmessage: true,
+      type: "streamlit:componentReady",
+      apiVersion: 1
+    };
+    window.parent.postMessage(readyMessage, "*");
+  </script>
+</body>
+</html>

@@ -14,6 +14,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
+import os
+import re
+import numpy as np
+import yfinance as yf
+
+# Declare Voice Assistant Component
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+voice_component_path = os.path.join(parent_dir, "voice_component")
+voice_assistant = components.declare_component("voice_assistant", path=voice_component_path)
 
 # Import Modular BuzzStreet Components
 import data_loader
@@ -193,6 +202,12 @@ if "initialized" not in st.session_state:
         ("user", "Hello! What is this system capable of?"),
         ("bot", "👋 Welcome to **BuzzStreet Narrative Intelligence Assistant!**\n\nI can analyze raw financial texts, compute sentiment metrics using VADER and a trained **Logistic Regression classifier**, detect overall market narrative shifts, and answer questions. Try asking: \n\n*“What is current market sentiment?”* or *“Why is the market negative?”*")
     ]
+    
+    st.session_state.active_page = "📈 Narrative Intelligence"
+    st.session_state.voice_speak_text = ""
+    st.session_state.last_heard_text = ""
+    st.session_state.predict_ticker = "^NSEI"
+    st.session_state.compare_tickers = ["^NSEI", "^BSESN"]
 
 # Helper function to trigger a full system refresh/re-evaluation
 def evaluate_market_state(bias_param, is_refresh=False, reblend_only=False):
@@ -294,6 +309,88 @@ def process_chat_query(query):
         ans = chatbot.generate_chatbot_response(query, ctx)
         st.session_state.chat_history.append(("bot", ans))
 
+def process_voice_command(command_text):
+    cmd = command_text.lower().strip()
+    
+    # 1. Navigation Commands
+    if any(k in cmd for k in ["narrative", "intelligence", "shift", "home", "dashboard"]):
+        st.session_state.active_page = "📈 Narrative Intelligence"
+        st.session_state.voice_speak_text = "Opening Narrative Intelligence Dashboard."
+        st.rerun()
+    elif any(k in cmd for k in ["nlp", "preprocess", "clean", "token"]):
+        st.session_state.active_page = "🧠 NLP Preprocessing"
+        st.session_state.voice_speak_text = "Showing NLP Preprocessing and TF-IDF Inspector."
+        st.rerun()
+    elif any(k in cmd for k in ["model", "cockpit", "training", "machine learning", "classifier"]):
+        st.session_state.active_page = "🤖 ML Training Cockpit"
+        st.session_state.voice_speak_text = "Navigating to Machine Learning Classifier Performance."
+        st.rerun()
+    elif any(k in cmd for k in ["chatbot", "assistant", "chat", "ask bot"]):
+        st.session_state.active_page = "💬 AI Narrative Chatbot"
+        st.session_state.voice_speak_text = "Opening AI Narrative Chatbot."
+        st.rerun()
+    elif any(k in cmd for k in ["predict", "forecast", "future", "suggestion"]):
+        st.session_state.active_page = "🔮 Stock & Trade Predictor"
+        st.session_state.voice_speak_text = "Opening Stock and Trade Future Predictor."
+        
+        # Check if the user specified a ticker to predict, e.g. "predict apple"
+        for word, ticker in [("apple", "AAPL"), ("tesla", "TSLA"), ("microsoft", "MSFT"), ("reliance", "RELIANCE.NS"), ("nifty", "^NSEI"), ("sensex", "^BSESN")]:
+            if word in cmd:
+                st.session_state.predict_ticker = ticker
+                st.session_state.voice_speak_text = f"Predicting future performance for {word.capitalize()}."
+                break
+        st.rerun()
+    elif any(k in cmd for k in ["compare", "comparison", "side by side"]):
+        st.session_state.active_page = "📊 Multi-Asset Comparison"
+        st.session_state.voice_speak_text = "Opening Multi-Asset Comparison Dashboard."
+        
+        # Check if they named companies to compare, e.g., "compare apple and tesla"
+        detected_tickers = []
+        ticker_map = {
+            "apple": "AAPL", "tesla": "TSLA", "microsoft": "MSFT", 
+            "reliance": "RELIANCE.NS", "nifty": "^NSEI", "sensex": "^BSESN"
+        }
+        for word, ticker in ticker_map.items():
+            if word in cmd:
+                detected_tickers.append(ticker)
+        if len(detected_tickers) >= 2:
+            st.session_state.compare_tickers = detected_tickers[:4] # limit to 4
+            st.session_state.voice_speak_text = f"Comparing performance of " + " and ".join([k.capitalize() for k in ticker_map.keys() if ticker_map[k] in detected_tickers])
+        st.rerun()
+        
+    # 2. General Queries (Pass to Chatbot directly!)
+    else:
+        st.session_state.active_page = "💬 AI Narrative Chatbot"
+        
+        vaders_c = [h["vader"]["compound"] for h in st.session_state.active_headlines_data]
+        lrs_c = [h["lr"] for h in st.session_state.active_headlines_data]
+        vader_w = st.session_state.get("vader_weight", 0.50)
+        
+        composite_idx = narrative_detector.calculate_composite_index(vaders_c, lrs_c, vader_weight=vader_w)
+        curr_ph = narrative_detector.detect_narrative_phase(composite_idx)
+        transition_path_str = narrative_detector.generate_transition_chain(st.session_state.market_history)
+        
+        ctx = {
+            "sentiment_index": composite_idx,
+            "narrative_phase": curr_ph,
+            "transition_chain": transition_path_str,
+            "headlines": st.session_state.active_headlines_data,
+            "nifty_val": st.session_state.nifty_val,
+            "nifty_change": st.session_state.nifty_change,
+            "model_accuracy": model_instance.accuracy,
+            "sensex_val": st.session_state.sensex_val,
+            "sensex_change": st.session_state.sensex_change
+        }
+        st.session_state.chat_history.append(("user", command_text))
+        ans = chatbot.generate_chatbot_response(command_text, ctx)
+        
+        # Clean answer for speech
+        clean_ans = re.sub(r'[\*#`🚨🔮📈🧠💬💻🤖⚙️📊⚖️⚠️]', '', ans)
+        clean_ans = clean_ans.split('\n')[0]
+        st.session_state.voice_speak_text = f"Voice query received. Here is the response: {clean_ans}"
+        st.session_state.chat_history.append(("bot", ans))
+        st.rerun()
+
 def handle_quick_prompt(prompt_text):
     process_chat_query(prompt_text)
 
@@ -333,7 +430,42 @@ with st.sidebar:
     # Avatar
     st.markdown('<img src="https://api.dicebear.com/7.x/bottts/svg?seed=BuzzStreet&backgroundColor=0b0d12" class="profile-img">', unsafe_allow_html=True)
     st.markdown('<div class="profile-name">BuzzStreet Engine</div>', unsafe_allow_html=True)
-    st.markdown('<div class="profile-role">Phase II: Intermediate NLP AI</div>', unsafe_allow_html=True)
+    st.markdown('<div class="profile-role">Phase III: Advanced NLP & AI Predictor</div>', unsafe_allow_html=True)
+    st.divider()
+    
+    # Page selector dropdown/radio to enable navigation
+    pages = [
+        "📈 Narrative Intelligence", 
+        "🧠 NLP Preprocessing", 
+        "🤖 ML Training Cockpit", 
+        "💬 AI Narrative Chatbot",
+        "🔮 Stock & Trade Predictor",
+        "📊 Multi-Asset Comparison"
+    ]
+    st.markdown("### 🧭 Navigation Panel")
+    selected_page = st.selectbox(
+        "Active Workspace:",
+        options=pages,
+        index=pages.index(st.session_state.active_page)
+    )
+    st.session_state.active_page = selected_page
+    
+    st.divider()
+    st.markdown("### 🎙️ Voice Assistant Control")
+    
+    # Render the custom voice assistant component
+    heard_text = voice_assistant(
+        key="voice_assistant_component", 
+        text_to_speak=st.session_state.voice_speak_text
+    )
+    
+    # Reset voice speech parameter to prevent loop speech
+    st.session_state.voice_speak_text = ""
+    
+    if heard_text and heard_text != st.session_state.last_heard_text:
+        st.session_state.last_heard_text = heard_text
+        process_voice_command(heard_text)
+        
     st.divider()
     
     st.markdown("### 🎛️ Sentiment Calibration")
@@ -400,17 +532,10 @@ st.markdown('<span class="milestone-badge">Phase II Milestone (50% Completion Re
 # ----------------------------------------------------
 # TABULAR LAYOUT FOR COCKPIT SECTIONS
 # ----------------------------------------------------
-tab_narrative, tab_nlp, tab_ml, tab_chatbot = st.tabs([
-    "📈 Narrative Intelligence", 
-    "🧠 NLP Cleaning & TF-IDF", 
-    "🤖 ML Training Cockpit", 
-    "💬 AI Narrative Chatbot"
-])
-
 # ==========================================
-# TAB 1: NARRATIVE INTELLIGENCE
+# PAGE ROUTER
 # ==========================================
-with tab_narrative:
+if st.session_state.active_page == "📈 Narrative Intelligence":
     # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
     st.markdown("### 📊 Market Atmosphere & Indexes")
     
@@ -701,7 +826,7 @@ with tab_narrative:
 # ==========================================
 # TAB 2: NLP PIPELINE INSPECTOR & TF-IDF
 # ==========================================
-with tab_nlp:
+elif st.session_state.active_page == "🧠 NLP Preprocessing":
     st.markdown("### 🔬 NLP Preprocessing Pipeline Inspector")
     st.markdown("Select any active headline to observe the step-by-step mathematical and grammatical cleaning transitions.")
     
@@ -783,7 +908,7 @@ with tab_nlp:
 # ==========================================
 # TAB 3: MACHINE LEARNING COCKPIT
 # ==========================================
-with tab_ml:
+elif st.session_state.active_page == "🤖 ML Training Cockpit":
     st.markdown("### 🤖 Supervised Classifier Performance")
     st.markdown("Evaluate the mathematical models comparing VADER (lexical-lexicon method) vs Logistic Regression (supervised statistical method).")
     
@@ -919,7 +1044,7 @@ with tab_ml:
 # ==========================================
 # TAB 4: INTERACTIVE AI CHATBOT
 # ==========================================
-with tab_chatbot:
+elif st.session_state.active_page == "💬 AI Narrative Chatbot":
     st.markdown("### 💬 AI Narrative Shift Assistant")
     st.markdown("An interactive AI bot designed to explain current market sentiment, transition anomalies, and textual pipeline details dynamically.")
     
@@ -951,6 +1076,326 @@ with tab_chatbot:
     if user_query:
         process_chat_query(user_query)
         st.rerun()
+
+elif st.session_state.active_page == "🔮 Stock & Trade Predictor":
+    st.markdown("### 🔮 Stock & Trade Future Predictor")
+    st.markdown("Forecast future asset valuations and evaluate technical trade recommendations based on quantitative indicator synthesis.")
+    
+    ticker_options = {
+        "Nifty 50 Index": "^NSEI",
+        "BSE Sensex Index": "^BSESN",
+        "Reliance Industries": "RELIANCE.NS",
+        "Apple Inc.": "AAPL",
+        "Tesla Inc.": "TSLA",
+        "Microsoft Corp.": "MSFT"
+    }
+    
+    col_t1, col_t2, col_t3 = st.columns([2, 1, 1])
+    
+    selected_label = col_t1.selectbox(
+        "Select Active Asset:",
+        options=list(ticker_options.keys()),
+        index=list(ticker_options.values()).index(st.session_state.predict_ticker)
+    )
+    ticker = ticker_options[selected_label]
+    st.session_state.predict_ticker = ticker
+    
+    period_options = {
+        "1 Month": "1mo",
+        "3 Months": "3mo",
+        "6 Months": "6mo",
+        "1 Year": "1y"
+    }
+    selected_period_label = col_t2.selectbox(
+        "Historical Period:",
+        options=list(period_options.keys()),
+        index=2 # 6 months
+    )
+    period = period_options[selected_period_label]
+    
+    forecast_horizon = col_t3.slider("Forecast Horizon (Days):", min_value=5, max_value=30, value=15, step=5)
+    
+    with st.spinner("Fetching historical quotes..."):
+        try:
+            df_hist = yf.download(ticker, period=period, interval="1d")
+            if isinstance(df_hist.columns, pd.MultiIndex):
+                df_hist.columns = df_hist.columns.get_level_values(0)
+        except Exception as e:
+            st.error(f"Failed to fetch market data: {e}")
+            df_hist = pd.DataFrame()
+            
+    if not df_hist.empty:
+        # Technical Indicator Calculations
+        prices = df_hist['Close'].values.tolist()
+        
+        # Linear Regression Forecast
+        n = len(prices)
+        lookback = min(60, n)
+        y = np.array(prices[-lookback:])
+        x = np.arange(lookback)
+        slope, intercept = np.polyfit(x, y, 1)
+        
+        # Recent momentum check (slope of last 10 days)
+        recent_lookback = min(10, n)
+        recent_y = np.array(prices[-recent_lookback:])
+        recent_x = np.arange(recent_lookback)
+        recent_slope, _ = np.polyfit(recent_x, recent_y, 1)
+        
+        # Blended slope
+        blended_slope = 0.6 * slope + 0.4 * recent_slope
+        
+        # Generate forecast
+        predicted_y = blended_slope * np.arange(1, forecast_horizon + 1) + prices[-1]
+        
+        # Confidence bands
+        residuals = y - (slope * x + intercept)
+        std_error = np.std(residuals)
+        lower_bound = predicted_y - 1.96 * std_error * np.sqrt(np.arange(1, forecast_horizon + 1))
+        upper_bound = predicted_y + 1.96 * std_error * np.sqrt(np.arange(1, forecast_horizon + 1))
+        
+        # Calculate 14-day RSI
+        delta = df_hist['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
+        current_rsi = float(rsi.iloc[-1]) if not rsi.empty and not pd.isna(rsi.iloc[-1]) else 50.0
+        
+        # Calculate SMAs
+        sma20 = df_hist['Close'].rolling(window=20).mean()
+        sma50 = df_hist['Close'].rolling(window=50).mean()
+        curr_sma20 = float(sma20.iloc[-1]) if not sma20.empty and not pd.isna(sma20.iloc[-1]) else prices[-1]
+        curr_sma50 = float(sma50.iloc[-1]) if not sma50.empty and not pd.isna(sma50.iloc[-1]) else prices[-1]
+        
+        # Recommendation Engine
+        signals = []
+        reasons = []
+        
+        if current_rsi < 35:
+            signals.append("BUY")
+            reasons.append(f"RSI is oversold at {current_rsi:.1f}, indicating standard bullish bounce conditions.")
+        elif current_rsi > 65:
+            signals.append("SELL")
+            reasons.append(f"RSI is overbought at {current_rsi:.1f}, indicating potential valuation consolidation.")
+        else:
+            signals.append("HOLD")
+            reasons.append(f"RSI indicator is stable at {current_rsi:.1f}.")
+            
+        if curr_sma20 > curr_sma50:
+            signals.append("BUY")
+            reasons.append(f"SMA 20 ({curr_sma20:,.2f}) sits above SMA 50 ({curr_sma50:,.2f}), representing a bullish golden cross trend.")
+        else:
+            signals.append("SELL")
+            reasons.append(f"SMA 20 ({curr_sma20:,.2f}) sits below SMA 50 ({curr_sma50:,.2f}), signaling standard death cross crossover.")
+            
+        if blended_slope > 0:
+            signals.append("BUY")
+            reasons.append(f"Quant forecast direction is positive (slope: {blended_slope:+.2f}).")
+        else:
+            signals.append("SELL")
+            reasons.append(f"Quant forecast direction is negative (slope: {blended_slope:+.2f}).")
+            
+        # Overall Card Logic
+        buy_count = signals.count("BUY")
+        sell_count = signals.count("SELL")
+        if buy_count >= 2:
+            recommendation = "STRONG BUY"
+            rec_color = "#10b981"
+            rec_bg = "rgba(16, 185, 129, 0.08)"
+            rec_border = "rgba(16, 185, 129, 0.2)"
+            rec_emoji = "🚀"
+        elif sell_count >= 2:
+            recommendation = "STRONG SELL"
+            rec_color = "#ef4444"
+            rec_bg = "rgba(239, 68, 68, 0.08)"
+            rec_border = "rgba(239, 68, 68, 0.2)"
+            rec_emoji = "🚨"
+        else:
+            recommendation = "HOLD"
+            rec_color = "#94a3b8"
+            rec_bg = "rgba(148, 163, 184, 0.08)"
+            rec_border = "rgba(148, 163, 184, 0.2)"
+            rec_emoji = "⚖️"
+            
+        # Top Plotly Graph
+        hist_dates = df_hist.index.strftime('%Y-%m-%d').tolist()
+        last_date = df_hist.index[-1]
+        future_dates = []
+        curr_date = last_date
+        while len(future_dates) < forecast_horizon:
+            curr_date += datetime.timedelta(days=1)
+            if curr_date.weekday() < 5:
+                future_dates.append(curr_date.strftime('%Y-%m-%d'))
+                
+        fig_pred = go.Figure()
+        
+        # Historical
+        fig_pred.add_trace(go.Scatter(
+            x=hist_dates[-60:],
+            y=prices[-60:],
+            name="Historical Close",
+            line=dict(color="#38bdf8", width=3)
+        ))
+        
+        # Predicted
+        fig_pred.add_trace(go.Scatter(
+            x=[hist_dates[-1]] + future_dates,
+            y=[prices[-1]] + predicted_y.tolist(),
+            name="AI Forecast",
+            line=dict(color="#a78bfa", width=3, dash="dash")
+        ))
+        
+        # Upper Bound
+        fig_pred.add_trace(go.Scatter(
+            x=[hist_dates[-1]] + future_dates,
+            y=[prices[-1]] + upper_bound.tolist(),
+            name="Upper Range",
+            line=dict(color="rgba(167, 139, 250, 0.0)", width=0),
+            showlegend=False
+        ))
+        
+        # Lower Bound
+        fig_pred.add_trace(go.Scatter(
+            x=[hist_dates[-1]] + future_dates,
+            y=[prices[-1]] + lower_bound.tolist(),
+            name="Uncertainty range",
+            fill="tonexty",
+            fillcolor="rgba(167, 139, 250, 0.06)",
+            line=dict(color="rgba(167, 139, 250, 0.0)", width=0),
+            showlegend=True
+        ))
+        
+        fig_pred.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color="#94a3b8"),
+            margin=dict(l=20, r=20, t=10, b=20),
+            height=380,
+            hovermode="x unified"
+        )
+        fig_pred.update_xaxes(gridcolor="#1e293b")
+        fig_pred.update_yaxes(gridcolor="#1e293b")
+        
+        st.plotly_chart(fig_pred, use_container_width=True)
+        
+        # Recommendation Dashboard
+        rec_col1, rec_col2 = st.columns([1, 1.5])
+        with rec_col1:
+            st.markdown(f"""
+            <div style="background-color: {rec_bg}; border: 1px solid {rec_border}; padding: 22px; border-radius: 16px; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                <div style="font-size: 0.8rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; line-height: 1;">Trade Signal</div>
+                <div style="font-size: 2.8rem; margin: 10px 0; font-weight: 800; color: {rec_color};">{rec_emoji} {recommendation}</div>
+                <div style="font-size: 0.85rem; color: #cbd5e1; font-weight: 500;">Composite Technical Score</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with rec_col2:
+            st.markdown("#### 🔍 Quantitative Analysis Summary")
+            for r in reasons:
+                st.markdown(f"- {r}")
+                
+    else:
+        st.warning("No data found for this asset. Please verify the ticker prefix.")
+
+elif st.session_state.active_page == "📊 Multi-Asset Comparison":
+    st.markdown("### 📊 Multi-Asset Comparative Charting")
+    st.markdown("Compare the relative performance of multiple assets side-by-side or overlaid, normalized to a base starting price index.")
+    
+    ticker_options = {
+        "Nifty 50 Index": "^NSEI",
+        "BSE Sensex Index": "^BSESN",
+        "S&P 500 ETF": "SPY",
+        "Reliance Industries": "RELIANCE.NS",
+        "Apple Inc.": "AAPL",
+        "Tesla Inc.": "TSLA",
+        "Microsoft Corp.": "MSFT"
+    }
+    
+    # Pre-select based on state
+    default_comparison = st.session_state.get("compare_tickers", ["^NSEI", "^BSESN"])
+    selected_labels = []
+    for label, val in ticker_options.items():
+        if val in default_comparison:
+            selected_labels.append(label)
+            
+    selected_assets_labels = st.multiselect(
+        "Select assets to compare (Max 4):",
+        options=list(ticker_options.keys()),
+        default=selected_labels if selected_labels else list(ticker_options.keys())[:2]
+    )
+    
+    selected_tickers = [ticker_options[label] for label in selected_assets_labels]
+    st.session_state.compare_tickers = selected_tickers
+    
+    if len(selected_tickers) < 1:
+        st.warning("Please select at least one asset to compare.")
+    else:
+        with st.spinner("Fetching asset data..."):
+            try:
+                comp_dfs = {}
+                for t in selected_tickers:
+                    df_t = yf.download(t, period="3mo", interval="1d")
+                    if isinstance(df_t.columns, pd.MultiIndex):
+                        df_t.columns = df_t.columns.get_level_values(0)
+                    if not df_t.empty:
+                        comp_dfs[t] = df_t
+            except Exception as e:
+                st.error(f"Error fetching comparative quotes: {e}")
+                comp_dfs = {}
+                
+        if comp_dfs:
+            fig_comp = go.Figure()
+            for t, df_t in comp_dfs.items():
+                closes = df_t['Close']
+                if len(closes) > 0:
+                    first_val = float(closes.iloc[0])
+                    normalized_closes = (closes / first_val - 1) * 100
+                    label = [k for k, v in ticker_options.items() if v == t][0]
+                    
+                    fig_comp.add_trace(go.Scatter(
+                        x=df_t.index.strftime('%Y-%m-%d').tolist(),
+                        y=normalized_closes.tolist(),
+                        name=label,
+                        line=dict(width=3)
+                    ))
+                    
+            fig_comp.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color="#94a3b8"),
+                yaxis=dict(title="Cumulative Return (%)"),
+                margin=dict(l=20, r=20, t=10, b=20),
+                height=400,
+                hovermode="x unified"
+            )
+            fig_comp.update_xaxes(gridcolor="#1e293b")
+            fig_comp.update_yaxes(gridcolor="#1e293b")
+            
+            st.plotly_chart(fig_comp, use_container_width=True)
+            
+            # Side-by-side Cards
+            st.markdown("#### ⚡ Real-Time Asset Performance Cards")
+            cols = st.columns(len(comp_dfs))
+            for idx, (t, df_t) in enumerate(comp_dfs.items()):
+                label = [k for k, v in ticker_options.items() if v == t][0]
+                closes = df_t['Close']
+                last_val = float(closes.iloc[-1])
+                prev_val = float(closes.iloc[-2]) if len(closes) > 1 else last_val
+                change_pct = ((last_val - prev_val) / prev_val) * 100
+                cum_ret = ((last_val / float(closes.iloc[0])) - 1) * 100
+                
+                with cols[idx]:
+                    st.markdown(f"""
+                    <div style="background-color: #131722; padding: 18px; border-radius: 12px; border: 1px solid #1e293b; text-align: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+                        <div style="font-size: 0.75rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">{label}</div>
+                        <div style="font-size: 1.8rem; font-weight: 800; margin: 5px 0;">{last_val:,.2f}</div>
+                        <div style="font-size: 0.85rem; color: {'#10b981' if change_pct >= 0 else '#ef4444'}; font-weight: 700;">
+                            {'▲' if change_pct >= 0 else '▼'} {change_pct:+.2f}% (Daily)
+                        </div>
+                        <div style="font-size: 0.8rem; color: #cbd5e1; margin-top: 8px;">
+                            3-Month Return: <b style="color: {'#10b981' if cum_ret >= 0 else '#ef4444'};">{cum_ret:+.2f}%</b>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
 # ==========================================
 # 5. FOOTER & ANOMALY marquee
