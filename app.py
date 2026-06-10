@@ -810,15 +810,64 @@ with tab_narrative:
             else:
                 return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
                 
-        # To avoid freezing the browser when showing huge datasets
-        if len(df_filtered) > 5000:
-            st.warning("⚠️ Rendering is truncated to the first 5,000 matching headlines to optimize performance.")
-            df_render = df_filtered.head(5000)
-        else:
-            df_render = df_filtered
+        # Pagination logic
+        page_size = 100
+        total_rows = len(df_filtered)
+        total_pages = max(1, (total_rows + page_size - 1) // page_size)
+        
+        # Initialize page session state if not exists
+        if "corpus_page" not in st.session_state:
+            st.session_state.corpus_page = 1
+            
+        # Track filter state changes to reset page number
+        current_filter_hash = f"{search_query}|{sentiment_filter}"
+        if "last_corpus_filter_hash" not in st.session_state:
+            st.session_state.last_corpus_filter_hash = current_filter_hash
+            st.session_state.corpus_page = 1
+        elif st.session_state.last_corpus_filter_hash != current_filter_hash:
+            st.session_state.last_corpus_filter_hash = current_filter_hash
+            st.session_state.corpus_page = 1
+            
+        # Bounds check
+        if st.session_state.corpus_page > total_pages:
+            st.session_state.corpus_page = total_pages
+        if st.session_state.corpus_page < 1:
+            st.session_state.corpus_page = 1
+            
+        # Display page navigation controls
+        col_prev, col_page, col_next = st.columns([1, 2, 1])
+        
+        with col_prev:
+            if st.button("⬅️ Previous Page", disabled=(st.session_state.corpus_page <= 1), use_container_width=True, key="prev_btn"):
+                st.session_state.corpus_page -= 1
+                st.rerun()
+                
+        with col_page:
+            selected_page = st.number_input(
+                f"Page (1 to {total_pages:,}):",
+                min_value=1,
+                max_value=total_pages,
+                value=int(st.session_state.corpus_page),
+                step=1,
+                key="corpus_page_input"
+            )
+            if selected_page != st.session_state.corpus_page:
+                st.session_state.corpus_page = selected_page
+                st.rerun()
+                
+        with col_next:
+            if st.button("Next Page ➡️", disabled=(st.session_state.corpus_page >= total_pages), use_container_width=True, key="next_btn"):
+                st.session_state.corpus_page += 1
+                st.rerun()
+                
+        start_idx = (st.session_state.corpus_page - 1) * page_size
+        end_idx = start_idx + page_size
+        
+        df_render = df_filtered.iloc[start_idx:end_idx]
 
         styled_all = df_render.style.map(color_label, subset=['Sentiment Label'])
         st.dataframe(styled_all, use_container_width=True, height=350)
+
 
 
 # ==========================================
