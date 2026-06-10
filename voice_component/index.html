@@ -73,7 +73,7 @@
     // Streamlit Component SDK messaging helper
     function sendValueToStreamlit(value) {
       const message = {
-        isstreamlitmessage: true,
+        isStreamlitMessage: true,
         type: "streamlit:setComponentValue",
         value: value
       };
@@ -171,7 +171,7 @@
 
     // Notify Streamlit that the component is loaded and ready
     const readyMessage = {
-      isstreamlitmessage: true,
+      isStreamlitMessage: true,
       type: "streamlit:componentReady",
       apiVersion: 1
     };
