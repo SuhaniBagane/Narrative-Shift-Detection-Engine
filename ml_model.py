@@ -187,16 +187,39 @@ class FinancialSentimentClassifier:
         self.confusion_matrix = None
         self.is_trained = False
         
-    def train(self):
+    def train(self, force_retrain=False):
         """
         Loads the training corpus (including CSV dataset if available), cleans text using the nlp_pipeline,
         extracts TF-IDF features, and trains the Logistic Regression classifier.
         Saves accuracy and evaluation metrics.
+        Loads from serialized files if they exist to prevent startup overhead, unless force_retrain=True.
         """
+        import os
+        import pickle
+
+        model_path = "data/model.pkl"
+        vec_path = "data/vectorizer.pkl"
+        metrics_path = "data/metrics.pkl"
+
+        if not force_retrain and os.path.exists(model_path) and os.path.exists(vec_path) and os.path.exists(metrics_path):
+            try:
+                with open(model_path, "rb") as f:
+                    self.model = pickle.load(f)
+                with open(vec_path, "rb") as f:
+                    self.vectorizer = pickle.load(f)
+                with open(metrics_path, "rb") as f:
+                    metrics = pickle.load(f)
+                    self.accuracy = metrics["accuracy"]
+                    self.report = metrics["report"]
+                    self.confusion_matrix = metrics["confusion_matrix"]
+                self.is_trained = True
+                return self.accuracy
+            except Exception as e:
+                print(f"Warning: Failed to load cached model, retraining... {e}")
+
         corpus = get_expanded_training_corpus()
         
         # Load from CSV if it exists
-        import os
         csv_path = "data/sentiment_data.csv"
         if os.path.exists(csv_path):
             try:
@@ -206,7 +229,14 @@ class FinancialSentimentClassifier:
                     df['Sentiment'] = df['Sentiment'].str.strip().str.capitalize()
                     # Filter valid labels
                     df = df[df['Sentiment'].isin(['Positive', 'Negative', 'Neutral'])]
-                    csv_data = list(zip(df['Sentence'], df['Sentiment']))
+                    
+                    # Sample up to 25,000 rows to prevent NLTK tokenization/POS-tagging bottlenecks
+                    if len(df) > 25000:
+                        df_sample = df.sample(n=25000, random_state=42)
+                    else:
+                        df_sample = df
+                        
+                    csv_data = list(zip(df_sample['Sentence'], df_sample['Sentiment']))
                     corpus.extend(csv_data)
             except Exception as e:
                 print(f"Warning: Failed to load training CSV {csv_path}: {e}")
@@ -232,8 +262,26 @@ class FinancialSentimentClassifier:
         self.report = classification_report(y_test, y_pred, output_dict=True)
         self.confusion_matrix = confusion_matrix(y_test, y_pred, labels=["Negative", "Neutral", "Positive"])
         self.is_trained = True
+
+        # Cache model & metrics
+        try:
+            os.makedirs("data", exist_ok=True)
+            with open(model_path, "wb") as f:
+                pickle.dump(self.model, f)
+            with open(vec_path, "wb") as f:
+                pickle.dump(self.vectorizer, f)
+            metrics = {
+                "accuracy": self.accuracy,
+                "report": self.report,
+                "confusion_matrix": self.confusion_matrix
+            }
+            with open(metrics_path, "wb") as f:
+                pickle.dump(metrics, f)
+        except Exception as e:
+            print(f"Warning: Failed to write model cache: {e}")
         
         return self.accuracy
+
 
     def predict_sentiment_lr(self, raw_headline):
         """

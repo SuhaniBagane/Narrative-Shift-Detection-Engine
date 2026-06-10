@@ -94,14 +94,21 @@ if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
         if 'Sentence' in df.columns and 'Sentiment' in df.columns:
             df = df.dropna(subset=['Sentence', 'Sentiment'])
-            for _, row in df.iterrows():
+            # Create set for each category to perform O(1) deduplication check
+            pool_sets = {k: set(v) for k, v in NEWS_POOL.items()}
+            
+            # Convert dataframe to dictionary records to avoid slow iterrows()
+            records = df[['Sentence', 'Sentiment']].to_dict('records')
+            for row in records:
                 sent = str(row['Sentiment']).strip().lower()
                 text = str(row['Sentence']).strip()
-                if sent in NEWS_POOL:
-                    if text not in NEWS_POOL[sent]:
+                if sent in pool_sets:
+                    if text not in pool_sets[sent]:
+                        pool_sets[sent].add(text)
                         NEWS_POOL[sent].append(text)
     except Exception as e:
         print(f"Warning: Failed to load news pool CSV {csv_path}: {e}")
+
 
 def generate_headlines(bias="neutral", count=10):
     """

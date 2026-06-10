@@ -772,8 +772,6 @@ with tab_narrative:
         st.dataframe(styled_grid, use_container_width=True, height=290)
         
     with stream_tab_all:
-        st.markdown("Explore the full ingested sentiment analysis training dataset containing **5,902** headlines from Kaggle and custom project expansions.")
-        
         # Build DataFrame of all headlines from data_loader.NEWS_POOL
         all_headlines = []
         for category, pool in data_loader.NEWS_POOL.items():
@@ -783,6 +781,8 @@ with tab_narrative:
                     "Sentiment Label": category.capitalize()
                 })
         df_all = pd.DataFrame(all_headlines)
+
+        st.markdown(f"Explore the full ingested sentiment analysis training dataset containing **{len(df_all):,}** headlines from Kaggle and custom project expansions.")
         
         # Add search and filter controls
         c1, c2 = st.columns([2, 1])
@@ -810,8 +810,16 @@ with tab_narrative:
             else:
                 return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
                 
-        styled_all = df_filtered.style.map(color_label, subset=['Sentiment Label'])
+        # To avoid freezing the browser when showing huge datasets
+        if len(df_filtered) > 5000:
+            st.warning("⚠️ Rendering is truncated to the first 5,000 matching headlines to optimize performance.")
+            df_render = df_filtered.head(5000)
+        else:
+            df_render = df_filtered
+
+        styled_all = df_render.style.map(color_label, subset=['Sentiment Label'])
         st.dataframe(styled_all, use_container_width=True, height=350)
+
 
 # ==========================================
 # TAB 2: NLP PIPELINE INSPECTOR & TF-IDF
@@ -980,8 +988,6 @@ with tab_ml:
     st.dataframe(df_compare, use_container_width=True, height=270)
 
     st.divider()
-    st.markdown("### 📊 Ingested Training Dataset Distribution")
-    st.markdown("Class distribution of the **5,902** financial news headlines loaded from the Kaggle dataset and custom project expansions.")
     
     dist_data = {
         "Sentiment Label": ["Neutral", "Positive", "Negative", "Panic (Simulated)"],
@@ -993,6 +999,10 @@ with tab_ml:
         ]
     }
     df_dist = pd.DataFrame(dist_data)
+
+    st.markdown("### 📊 Ingested Training Dataset Distribution")
+    st.markdown(f"Class distribution of the **{sum(dist_data['Headline Count']):,}** financial news headlines loaded from the Kaggle dataset and custom project expansions.")
+
     
     dist_col1, dist_col2 = st.columns(2)
     with dist_col1:

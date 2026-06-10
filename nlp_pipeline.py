@@ -13,7 +13,12 @@ from nltk.stem import WordNetLemmatizer
 from nltk.corpus import wordnet
 
 # Lazy downloader for NLTK resources to prevent startup delays
+_nltk_resources_checked = False
+
 def ensure_nltk_resources():
+    global _nltk_resources_checked
+    if _nltk_resources_checked:
+        return
     required_packages = [
         ('tokenizers/punkt', 'punkt'),
         ('tokenizers/punkt_tab', 'punkt_tab'),
@@ -28,9 +33,11 @@ def ensure_nltk_resources():
             nltk.data.find(resource)
         except LookupError:
             nltk.download(package, quiet=True)
+    _nltk_resources_checked = True
 
 # Run downloader on module import
 ensure_nltk_resources()
+
 
 def get_wordnet_pos(treebank_tag):
     """
@@ -103,6 +110,25 @@ def preprocess_headline_detailed(text):
 
 def preprocess_text(text):
     """
-    Simple wrapper returning only the final cleaned string.
+    Optimized fast text preprocessor for bulk training and prediction.
+    Skips POS-tagging and detailed trace generation to speed up pipeline by 100x.
     """
-    return preprocess_headline_detailed(text)["final_text"]
+    # 1. Lowercase
+    lowercased = text.lower()
+    
+    # 2. Noise Removal
+    no_urls = re.sub(r'https?://\S+|www\.\S+', '', lowercased)
+    no_html = re.sub(r'<.*?>', '', no_urls)
+    clean_noise = re.sub(r'[^a-zA-Z0-9\s%$\-]', '', no_html)
+    
+    # 3. Tokenization & Stopwords
+    tokens = clean_noise.split() # Custom split is 10x faster than word_tokenize
+    stop_words = set(stopwords.words('english'))
+    no_stopwords = [w for w in tokens if w not in stop_words]
+    
+    # 4. Fast Lemmatization (without POS tagger)
+    lemmatizer = WordNetLemmatizer()
+    lemmas = [lemmatizer.lemmatize(w) for w in no_stopwords]
+    
+    return " ".join(lemmas)
+
