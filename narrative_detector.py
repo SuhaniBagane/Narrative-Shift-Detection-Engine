@@ -94,3 +94,83 @@ def generate_transition_chain(history):
             
     # Format with nice arrow indicators
     return " → ".join(deduped_phases)
+
+import numpy as np
+
+def predict_future_market_trajectory(history, horizon_mode="Intraday Hours (+24H)", steps=8):
+    """
+    Predicts future market valuation trajectory (Nifty 50, Sensex, Sentiment, Narrative Phase)
+    and computes upper/lower confidence bands for future horizons:
+    - "Intraday Hours (+24H)": Hourly increments (+3h, +6h, +9h, +12h, etc.)
+    - "7-Day Market Horizon (+7D)": Daily increments (Day +1, Day +2, Day +3, etc.)
+    - "30-Day Outlook (+30D)": Multi-day increments (Day +4, Day +8, Day +12, etc.)
+    """
+    if not history:
+        return []
+        
+    last_record = history[-1]
+    curr_nifty = last_record.get("nifty", 22400.0)
+    curr_sensex = last_record.get("sensex", 73850.0)
+    curr_sentiment = last_record.get("sentiment", 0.0)
+    
+    # Calculate price momentum from history
+    nifty_prices = [h.get("nifty", curr_nifty) for h in history]
+    if len(nifty_prices) > 1:
+        price_change_pct = (nifty_prices[-1] - nifty_prices[0]) / nifty_prices[0]
+    else:
+        price_change_pct = 0.0
+        
+    # Blended drift slope per step: driven by sentiment index (65%) + historical price momentum (35%)
+    sentiment_drift = curr_sentiment * 0.004
+    momentum_drift = price_change_pct * 0.05
+    step_drift = (0.65 * sentiment_drift) + (0.35 * momentum_drift)
+    
+    # Base standard deviation error for confidence bounds
+    std_dev_nifty = curr_nifty * 0.003
+    std_dev_sensex = curr_sensex * 0.003
+    
+    forecast_records = []
+    
+    for i in range(1, steps + 1):
+        # Calculate expected change with slight decay factor to avoid divergence
+        decay = 0.95 ** (i - 1)
+        cumulative_factor = 1.0 + (step_drift * i * decay)
+        
+        pred_nifty = round(curr_nifty * cumulative_factor, 2)
+        pred_sensex = round(curr_sensex * cumulative_factor, 2)
+        
+        # Expanding confidence bands
+        uncertainty = np.sqrt(i) * 1.5
+        nifty_lower = round(pred_nifty - (std_dev_nifty * uncertainty), 2)
+        nifty_upper = round(pred_nifty + (std_dev_nifty * uncertainty), 2)
+        
+        sensex_lower = round(pred_sensex - (std_dev_sensex * uncertainty), 2)
+        sensex_upper = round(pred_sensex + (std_dev_sensex * uncertainty), 2)
+        
+        # Projected future sentiment (drifts toward current mood)
+        pred_sentiment = round(max(-1.0, min(1.0, curr_sentiment * (0.92 ** i))), 3)
+        pred_phase = detect_narrative_phase(pred_sentiment)
+        
+        # Generate future label
+        if horizon_mode == "Intraday Hours (+24H)":
+            label = f"+{i*3}h"
+        elif horizon_mode == "7-Day Market Horizon (+7D)":
+            label = f"Day +{i}"
+        else: # 30-Day Outlook
+            label = f"Day +{i*4}"
+            
+        forecast_records.append({
+            "time": label,
+            "sentiment": pred_sentiment,
+            "phase": pred_phase,
+            "nifty": pred_nifty,
+            "nifty_lower": nifty_lower,
+            "nifty_upper": nifty_upper,
+            "sensex": pred_sensex,
+            "sensex_lower": sensex_lower,
+            "sensex_upper": sensex_upper,
+            "is_future": True
+        })
+        
+    return forecast_records
+

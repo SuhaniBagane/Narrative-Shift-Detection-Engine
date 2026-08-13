@@ -628,7 +628,7 @@ with tab_narrative:
     # Dynamic high-fidelity advanced chart widget configuration matching HSL dark cockpit style
     tradingview_html = f"""
     <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="height:480px;width:100%;border-radius:12px;overflow:hidden;border:1px solid #1e293b;box-shadow:0 4px 6px -1px rgba(0,0,0,0.5);">
+    <div class="tradingview-widget-container" style="height:680px;width:100%;border-radius:12px;overflow:hidden;border:1px solid #1e293b;box-shadow:0 4px 6px -1px rgba(0,0,0,0.5);">
       <div id="tradingview_advanced_chart" style="height:100%;width:100%;"></div>
       <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
       <script type="text/javascript">
@@ -658,37 +658,97 @@ with tab_narrative:
     <!-- TradingView Widget END -->
     """
     
-    components.html(tradingview_html, height=485)
+    components.html(tradingview_html, height=685)
     st.divider()
     
-    # B. Interactive Graphs (Sentiment trend & Narrative timeline side-by-side)
+    # B. Interactive Graphs & Multi-Horizon Future Market Forecasting
+    st.markdown("#### 🔮 Multi-Horizon Future Market Prediction & Narrative Trajectory")
+    st.markdown("Synthesizes textual sentiment index, historical momentum, and quantitative volatility to project future market levels and narrative shifts.")
+    
+    c_f1, c_f2 = st.columns([2, 1])
+    with c_f1:
+        horizon_mode = st.selectbox(
+            "Select Future Forecast Horizon:",
+            options=["⚡ Intraday Hours (+24H)", "📅 7-Day Market Horizon (+7D)", "🔮 30-Day Outlook (+30D)"],
+            index=0,
+            key="horizon_mode_select"
+        )
+        
+    df_history = pd.DataFrame(st.session_state.market_history)
+    forecast_data = narrative_detector.predict_future_market_trajectory(
+        st.session_state.market_history, 
+        horizon_mode=horizon_mode
+    )
+    df_forecast = pd.DataFrame(forecast_data) if forecast_data else pd.DataFrame()
+    
     g_col1, g_col2 = st.columns(2)
     
-    df_history = pd.DataFrame(st.session_state.market_history)
-    
     with g_col1:
-        st.markdown("#### 📈 Composite Sentiment & Nifty 50 Trend")
-        st.markdown("Dual axis view of textual sentiment driving actual index valuations over time.")
+        st.markdown("##### 📈 Historical & Future Market Valuation Path")
+        st.markdown("Historical trend seamlessly connecting to future price prediction and confidence bounds.")
         
         fig = go.Figure()
-        # Add sentiment line
+        
+        # 1. Historical Sentiment Index
         fig.add_trace(go.Scatter(
             x=df_history["time"], 
             y=df_history["sentiment"],
-            name="Sentiment Index",
-            line=dict(color="#38bdf8", width=3, dash='dot'),
+            name="Hist Sentiment",
+            line=dict(color="#38bdf8", width=2, dash='dot'),
             yaxis="y1"
         ))
-        # Add Nifty line
+        
+        # 2. Historical Nifty 50
         fig.add_trace(go.Scatter(
             x=df_history["time"], 
             y=df_history["nifty"],
-            name="Nifty 50",
-            line=dict(color="#10b981", width=4),
+            name="Hist Nifty 50",
+            line=dict(color="#10b981", width=3.5),
             yaxis="y2"
         ))
         
-        # Configure layout with dual Y axes
+        if not df_forecast.empty:
+            # Combine connecting point from last historical record to first forecast record
+            last_time = df_history["time"].iloc[-1]
+            last_nifty = df_history["nifty"].iloc[-1]
+            last_sent = df_history["sentiment"].iloc[-1]
+            
+            f_times = [last_time] + list(df_forecast["time"])
+            f_nifty = [last_nifty] + list(df_forecast["nifty"])
+            f_sent = [last_sent] + list(df_forecast["sentiment"])
+            f_upper = [last_nifty] + list(df_forecast["nifty_upper"])
+            f_lower = [last_nifty] + list(df_forecast["nifty_lower"])
+            
+            # 3. Forecast Nifty Line
+            fig.add_trace(go.Scatter(
+                x=f_times,
+                y=f_nifty,
+                name="Predicted Nifty 50",
+                line=dict(color="#f59e0b", width=3.5, dash='dash'),
+                yaxis="y2"
+            ))
+            
+            # 4. Upper & Lower Confidence Fill Band
+            fig.add_trace(go.Scatter(
+                x=f_times + f_times[::-1],
+                y=f_upper + f_lower[::-1],
+                fill='todense',
+                fillcolor='rgba(245, 158, 11, 0.12)',
+                line=dict(color='rgba(255,255,255,0)'),
+                hoverinfo="skip",
+                name="95% Confidence Band",
+                yaxis="y2"
+            ))
+            
+            # 5. Forecast Sentiment Line
+            fig.add_trace(go.Scatter(
+                x=f_times,
+                y=f_sent,
+                name="Predicted Sentiment",
+                line=dict(color="#c084fc", width=2, dash='dot'),
+                yaxis="y1"
+            ))
+            
         fig.update_layout(
             yaxis=dict(title=dict(text="Sentiment Index (-1.0 to +1.0)", font=dict(color="#38bdf8")), tickfont=dict(color="#38bdf8")),
             yaxis2=dict(title=dict(text="Nifty 50 Price", font=dict(color="#10b981")), tickfont=dict(color="#10b981"), anchor="x", overlaying="y", side="right"),
@@ -698,47 +758,93 @@ with tab_narrative:
             margin=dict(l=20, r=20, t=10, b=20),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             font=dict(color="#94a3b8"),
-            height=320
+            height=520
         )
         fig.update_xaxes(gridcolor="#1e293b")
         fig.update_yaxes(gridcolor="#1e293b")
         st.plotly_chart(fig, use_container_width=True)
         
     with g_col2:
-        st.markdown("#### 🔄 Narrative Shift Phase Timeline")
-        st.markdown("Step plot demonstrating discrete categorical transitions between Optimistic, Neutral, Fear, and Panic phases.")
+        st.markdown("##### 🔄 Future Narrative Shift Phase Timeline")
+        st.markdown("Step plot forecasting transition states across historical and future horizons.")
         
-        # Map categorical phases to numeric values for plotting steps
         phase_map = {"Panic": 0, "Fear": 1, "Neutral": 2, "Optimistic": 3}
         df_history["phase_numeric"] = df_history["phase"].map(phase_map)
+        df_history["Type"] = "Historical"
         
+        combined_df = df_history[["time", "phase_numeric", "Type"]].copy()
+        
+        if not df_forecast.empty:
+            df_forecast_copy = df_forecast.copy()
+            df_forecast_copy["phase_numeric"] = df_forecast_copy["phase"].map(phase_map)
+            df_forecast_copy["Type"] = "Forecast"
+            combined_df = pd.concat([combined_df, df_forecast_copy[["time", "phase_numeric", "Type"]]], ignore_index=True)
+            
         fig_step = px.line(
-            df_history, 
+            combined_df, 
             x="time", 
-            y="phase_numeric", 
+            y="phase_numeric",
+            color="Type",
+            color_discrete_map={"Historical": "#818cf8", "Forecast": "#f59e0b"},
             line_shape="hv",
             markers=True
         )
-        fig_step.update_traces(line=dict(color="#a78bfa", width=3), marker=dict(size=8, color="#818cf8"))
+        fig_step.update_traces(marker=dict(size=8))
         
         fig_step.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             margin=dict(l=20, r=20, t=10, b=20),
             font=dict(color="#94a3b8"),
-            height=320,
+            height=520,
             yaxis=dict(
                 tickvals=[0, 1, 2, 3],
                 ticktext=["🚨 Panic", "⚠️ Fear", "⚖️ Neutral", "🚀 Optimistic"],
                 title="Narrative Phase"
             ),
-            xaxis=dict(title="Simulated Time Ticks")
+            xaxis=dict(title="Time Progression (Past ➔ Future)")
         )
         fig_step.update_xaxes(gridcolor="#1e293b")
         fig_step.update_yaxes(gridcolor="#1e293b")
         st.plotly_chart(fig_step, use_container_width=True)
         
+    # Display Future Market Intelligence Summary Card
+    if not df_forecast.empty:
+        last_hist_nifty = df_history["nifty"].iloc[-1]
+        last_hist_sensex = df_history["sensex"].iloc[-1]
+        final_target_nifty = df_forecast["nifty"].iloc[-1]
+        final_target_sensex = df_forecast["sensex"].iloc[-1]
+        final_phase = df_forecast["phase"].iloc[-1]
+        
+        nifty_diff_pct = ((final_target_nifty - last_hist_nifty) / last_hist_nifty) * 100
+        sensex_diff_pct = ((final_target_sensex - last_hist_sensex) / last_hist_sensex) * 100
+        
+        card_color = "#10b981" if nifty_diff_pct >= 0 else "#ef4444"
+        card_bg = "rgba(16, 185, 129, 0.08)" if nifty_diff_pct >= 0 else "rgba(239, 68, 68, 0.08)"
+        direction_label = "BULLISH EXPANSION 🚀" if nifty_diff_pct >= 0 else "BEARISH RETRENCHMENT ⚠️"
+        
+        st.markdown(f"""
+        <div style="background-color: {card_bg}; border: 1px solid {card_color}; padding: 18px 24px; border-radius: 12px; margin: 15px 0 25px 0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <div style="font-size: 0.85rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em;">Future Market Target ({horizon_mode})</div>
+                    <div style="font-size: 1.8rem; font-weight: 800; color: {card_color}; margin-top: 4px;">
+                        Nifty Target: {final_target_nifty:,.2f} ({nifty_diff_pct:+.2f}%) | Sensex: {final_target_sensex:,.2f} ({sensex_diff_pct:+.2f}%)
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 0.85rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Projected Narrative Phase</div>
+                    <div style="font-size: 1.3rem; font-weight: 700; color: #ffffff; margin-top: 4px;">{final_phase} Mood ({direction_label})</div>
+                </div>
+            </div>
+            <div style="font-size: 0.85rem; color: #cbd5e1; margin-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); padding-top: 8px;">
+                💡 <b>Forecast Model Logic:</b> Synthesizing current sentiment index ({st.session_state.market_history[-1]['sentiment']}) and price momentum to project confidence interval bounds [{df_forecast['nifty_lower'].iloc[-1]:,.2f} to {df_forecast['nifty_upper'].iloc[-1]:,.2f}].
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
     st.divider()
+
     
     # C. Dynamic Live Headlines Stream Table
     st.markdown("#### 🚨 Captured Financial News Streams")
@@ -1174,7 +1280,7 @@ with tab_predict:
     )
     period = period_options[selected_period_label]
     
-    forecast_horizon = col_t3.slider("Forecast Horizon (Days):", min_value=5, max_value=30, value=15, step=5)
+    forecast_horizon = col_t3.slider("Forecast Horizon (Days):", min_value=5, max_value=60, value=20, step=5)
     
     with st.spinner("Fetching historical quotes..."):
         try:
@@ -1331,7 +1437,7 @@ with tab_predict:
             plot_bgcolor='rgba(0,0,0,0)',
             font=dict(color="#94a3b8"),
             margin=dict(l=20, r=20, t=10, b=20),
-            height=380,
+            height=550,
             hovermode="x unified"
         )
         fig_pred.update_xaxes(gridcolor="#1e293b")
