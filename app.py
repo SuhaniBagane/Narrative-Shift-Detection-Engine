@@ -191,7 +191,7 @@ if "initialized" not in st.session_state:
     st.session_state.vader_weight = 0.50
     
     # Generate initial active headlines
-    initial_raw = data_loader.generate_headlines(bias="neutral", count=8)
+    initial_raw = data_loader.generate_headlines(bias="neutral", count=20)
     st.session_state.active_headlines_raw = initial_raw
     st.session_state.active_headlines_data = [] # List to hold fully analyzed headlines
     
@@ -219,7 +219,8 @@ def evaluate_market_state(bias_param, is_refresh=False, reblend_only=False):
         lr_sentiment_dicts = [h["lr"] for h in st.session_state.active_headlines_data]
     else:
         # 1. Generate new headlines
-        raw_headlines = data_loader.generate_headlines(bias=bias_param, count=8)
+        raw_headlines = data_loader.generate_headlines(bias=bias_param, count=20)
+
         st.session_state.active_headlines_raw = raw_headlines
         
         # 2. Analyze sentiment with VADER & Logistic Regression
@@ -741,15 +742,38 @@ with tab_narrative:
     
     # C. Dynamic Live Headlines Stream Table
     st.markdown("#### 🚨 Captured Financial News Streams")
+    st.markdown("Dynamic stream of financial headlines ingested into the engine. Toggle between the **Active 20-Headline Stream** and the **Full 300,000+ Kaggle Corpus** directly in this column.")
+
+    # Top Control Toolbar
+    c_mode, c_search, c_filter = st.columns([2, 2, 1])
     
-    stream_tab_active, stream_tab_all = st.tabs([
-        "🌌 Active Captured Stream (Simulation)", 
-        "📂 Entire Labeled News Corpus (Kaggle Dataset)"
-    ])
-    
-    with stream_tab_active:
-        st.markdown("The underlying dynamic stream of headlines ingested by the system. Use the sidebar controls to alter this stream.")
+    with c_mode:
+        stream_view_mode = st.radio(
+            "Stream View Mode:",
+            options=["⚡ Active 20 Batch Stream", "📂 Full Ingested Kaggle Corpus"],
+            horizontal=True,
+            key="stream_view_mode_choice"
+        )
         
+    with c_search:
+        search_query = st.text_input("Search Headlines:", placeholder="e.g., Apple, Nifty, inflation...", key="corpus_search")
+        
+    with c_filter:
+        sentiment_filter = st.selectbox(
+            "Filter Mood:", 
+            options=["All", "Positive", "Negative", "Neutral", "Panic"],
+            key="corpus_sentiment_filter"
+        )
+
+    def color_sentiment(val):
+        if val == 'Positive':
+            return 'background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold; border-left: 3px solid #10b981;'
+        elif val in ['Negative', 'Panic']:
+            return 'background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: bold; border-left: 3px solid #ef4444;'
+        else:
+            return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
+
+    if stream_view_mode == "⚡ Active 20 Batch Stream":
         grid_data = []
         for h in st.session_state.active_headlines_data:
             grid_data.append({
@@ -759,19 +783,17 @@ with tab_narrative:
                 "ML LogReg Sentiment": h["lr"]["Sentiment Label"]
             })
         df_grid = pd.DataFrame(grid_data)
-        
-        def color_sentiment(val):
-            if val == 'Positive':
-                return 'background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold; border-left: 3px solid #10b981;'
-            elif val == 'Negative':
-                return 'background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: bold; border-left: 3px solid #ef4444;'
-            else:
-                return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
-                
+
+        # Apply filtering if user searched or filtered
+        if sentiment_filter != "All":
+            df_grid = df_grid[(df_grid["VADER Sentiment"] == sentiment_filter) | (df_grid["ML LogReg Sentiment"] == sentiment_filter)]
+        if search_query:
+            df_grid = df_grid[df_grid["Financial News Headline"].str.contains(search_query, case=False, na=False)]
+
         styled_grid = df_grid.style.map(color_sentiment, subset=['VADER Sentiment', 'ML LogReg Sentiment'])
-        st.dataframe(styled_grid, use_container_width=True, height=290)
+        st.dataframe(styled_grid, use_container_width=True, height=350)
         
-    with stream_tab_all:
+    else: # 📂 Full Ingested Kaggle Corpus
         # Build DataFrame of all headlines from data_loader.NEWS_POOL
         all_headlines = []
         for category, pool in data_loader.NEWS_POOL.items():
@@ -781,17 +803,6 @@ with tab_narrative:
                     "Sentiment Label": category.capitalize()
                 })
         df_all = pd.DataFrame(all_headlines)
-
-        st.markdown(f"Explore the full ingested sentiment analysis training dataset containing **{len(df_all):,}** headlines from Kaggle and custom project expansions.")
-        
-        # Add search and filter controls
-        c1, c2 = st.columns([2, 1])
-        search_query = c1.text_input("Search Headlines:", placeholder="e.g., Apple, Nifty, inflation...", key="corpus_search")
-        sentiment_filter = c2.selectbox(
-            "Filter by Sentiment:", 
-            options=["All", "Positive", "Negative", "Neutral", "Panic"],
-            key="corpus_sentiment_filter"
-        )
         
         # Filter logic
         df_filtered = df_all
@@ -800,26 +811,16 @@ with tab_narrative:
         if search_query:
             df_filtered = df_filtered[df_filtered["Headline Text"].str.contains(search_query, case=False, na=False)]
             
-        st.markdown(f"Showing **{len(df_filtered):,}** matching headlines.")
+        st.markdown(f"Showing **{len(df_filtered):,}** matching headlines out of **{len(df_all):,}** total ingested Kaggle records.")
         
-        def color_label(val):
-            if val == 'Positive':
-                return 'background-color: rgba(16, 185, 129, 0.15); color: #34d399; font-weight: bold;'
-            elif val == 'Negative' or val == 'Panic':
-                return 'background-color: rgba(239, 68, 68, 0.15); color: #f87171; font-weight: bold;'
-            else:
-                return 'background-color: rgba(148, 163, 184, 0.1); color: #94a3b8; font-weight: bold;'
-                
         # Pagination logic
         page_size = 100
         total_rows = len(df_filtered)
         total_pages = max(1, (total_rows + page_size - 1) // page_size)
         
-        # Initialize page session state if not exists
         if "corpus_page" not in st.session_state:
             st.session_state.corpus_page = 1
             
-        # Track filter state changes to reset page number
         current_filter_hash = f"{search_query}|{sentiment_filter}"
         if "last_corpus_filter_hash" not in st.session_state:
             st.session_state.last_corpus_filter_hash = current_filter_hash
@@ -828,15 +829,12 @@ with tab_narrative:
             st.session_state.last_corpus_filter_hash = current_filter_hash
             st.session_state.corpus_page = 1
             
-        # Bounds check
         if st.session_state.corpus_page > total_pages:
             st.session_state.corpus_page = total_pages
         if st.session_state.corpus_page < 1:
             st.session_state.corpus_page = 1
             
-        # Display page navigation controls
         col_prev, col_page, col_next = st.columns([1, 2, 1])
-        
         with col_prev:
             if st.button("⬅️ Previous Page", disabled=(st.session_state.corpus_page <= 1), use_container_width=True, key="prev_btn"):
                 st.session_state.corpus_page -= 1
@@ -863,10 +861,24 @@ with tab_narrative:
         start_idx = (st.session_state.corpus_page - 1) * page_size
         end_idx = start_idx + page_size
         
-        df_render = df_filtered.iloc[start_idx:end_idx]
+        df_page = df_filtered.iloc[start_idx:end_idx]
+        
+        # Build 4-column dataframe matching active stream schema
+        page_grid_data = []
+        for _, row in df_page.iterrows():
+            text = row["Headline Text"]
+            sent = row["Sentiment Label"]
+            page_grid_data.append({
+                "Timestamp": "Ingested",
+                "Financial News Headline": text,
+                "VADER Sentiment": sent,
+                "ML LogReg Sentiment": sent
+            })
+        df_render = pd.DataFrame(page_grid_data)
 
-        styled_all = df_render.style.map(color_label, subset=['Sentiment Label'])
+        styled_all = df_render.style.map(color_sentiment, subset=['VADER Sentiment', 'ML LogReg Sentiment'])
         st.dataframe(styled_all, use_container_width=True, height=350)
+
 
 
 

@@ -110,7 +110,7 @@ if os.path.exists(csv_path):
         print(f"Warning: Failed to load news pool CSV {csv_path}: {e}")
 
 
-def generate_headlines(bias="neutral", count=10):
+def generate_headlines(bias="neutral", count=20):
     """
     Generates a batch of news headlines based on the current market narrative bias.
     bias can be: "bullish" (optimistic), "bearish" (fear), "panic", or "neutral"

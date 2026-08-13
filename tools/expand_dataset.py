@@ -10,7 +10,9 @@ COMPANIES = [
     "TCS", "Infosys", "HDFC Bank", "ICICI Bank", "Tata Motors", 
     "Airtel", "State Bank of India", "L&T", "Adani Enterprises", "ITC",
     "JPMorgan", "Morgan Stanley", "Goldman Sachs", "Berkshire Hathaway",
-    "Walmart", "ExxonMobil", "Chevron", "Wipro", "SBI", "Maruti Suzuki"
+    "Walmart", "ExxonMobil", "Chevron", "Wipro", "SBI", "Maruti Suzuki",
+    "Bitcoin", "Ethereum", "Spot Gold", "Brent Crude", "S&P 500", "Nasdaq 100",
+    "Dow Jones", "AMD", "Intel", "TSMC", "Broadcom", "Oracle", "Palantir"
 ]
 
 CURRENCIES = ["USD", "EUR", "INR", "GBP", "JPY", "CAD", "AUD"]
@@ -50,7 +52,8 @@ def perturb_sentence(sentence):
 def main():
     input_path = "data/sentiment_data.csv"
     output_path = "data/sentiment_data.csv"
-    target_rows = 250000
+    target_rows = 300000
+
     
     if not os.path.exists(input_path):
         print(f"Error: Base dataset {input_path} not found.")
