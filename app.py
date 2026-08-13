@@ -604,62 +604,237 @@ with tab_narrative:
     st.divider()
     
     # ----------------------------------------------------
-    # ADVANCED LIVE GLOBAL MARKETS DESK (TradingView Embed)
+    # ADVANCED LIVE GLOBAL MARKETS DESK & AI FUTURE PREDICTION
     # ----------------------------------------------------
-    st.markdown("### 📊 Live Global Markets Desk")
-    st.markdown("Real-time streaming feeds directly from TradingView global exchanges. Toggle active assets to analyze visual price trends and volume actions:")
+    st.markdown("### 📊 Live Global Markets Desk & AI Future Prediction Chart")
+    st.markdown("Real-time live market data stream with integrated AI future price forecasts, confidence interval bands, and technical indicators.")
+
+    # Top Control Bar: Asset Selector & View Mode
+    c_live1, c_live2, c_live3 = st.columns([2, 2, 1])
     
-    symbol_dict = {
-        "NSE Nifty 50 (Index)": "NSE:NIFTY",
-        "BSE Sensex (Index)": "BOM:SENSEX",
-        "S&P 500 ETF (SPY)": "AMEX:SPY",
-        "Reliance Industries (RELIANCE)": "NSE:RELIANCE",
-        "Apple Inc. (AAPL)": "NASDAQ:AAPL",
-        "Tesla Inc. (TSLA)": "NASDAQ:TSLA"
+    asset_options = {
+        "NSE Nifty 50 Index": {"yf": "^NSEI", "tv": "NSE:NIFTY"},
+        "BSE Sensex Index": {"yf": "^BSESN", "tv": "BOM:SENSEX"},
+        "S&P 500 ETF (SPY)": {"yf": "SPY", "tv": "AMEX:SPY"},
+        "Nasdaq 100 ETF (QQQ)": {"yf": "QQQ", "tv": "NASDAQ:QQQ"},
+        "Reliance Industries": {"yf": "RELIANCE.NS", "tv": "NSE:RELIANCE"},
+        "Apple Inc. (AAPL)": {"yf": "AAPL", "tv": "NASDAQ:AAPL"},
+        "Tesla Inc. (TSLA)": {"yf": "TSLA", "tv": "NASDAQ:TSLA"},
+        "NVIDIA Corp. (NVDA)": {"yf": "NVDA", "tv": "NASDAQ:NVDA"},
+        "Microsoft Corp. (MSFT)": {"yf": "MSFT", "tv": "NASDAQ:MSFT"}
     }
     
-    tv_symbol_label = st.selectbox(
-        "Select Active Live Asset Feed:",
-        options=list(symbol_dict.keys()),
-        index=0
+    selected_asset_name = c_live1.selectbox(
+        "Select Active Market Asset:",
+        options=list(asset_options.keys()),
+        index=0,
+        key="desk_asset_select"
     )
-    tv_symbol = symbol_dict[tv_symbol_label]
     
-    # Dynamic high-fidelity advanced chart widget configuration matching HSL dark cockpit style
-    tradingview_html = f"""
-    <!-- TradingView Widget BEGIN -->
-    <div class="tradingview-widget-container" style="height:680px;width:100%;border-radius:12px;overflow:hidden;border:1px solid #1e293b;box-shadow:0 4px 6px -1px rgba(0,0,0,0.5);">
-      <div id="tradingview_advanced_chart" style="height:100%;width:100%;"></div>
-      <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-      <script type="text/javascript">
-      new TradingView.widget({{
-        "width": "100%",
-        "height": "100%",
-        "symbol": "{tv_symbol}",
-        "interval": "D",
-        "timezone": "Etc/UTC",
-        "theme": "dark",
-        "style": "1",
-        "locale": "en",
-        "toolbar_bg": "#131722",
-        "enable_publishing": false,
-        "hide_side_toolbar": false,
-        "allow_symbol_change": true,
-        "container_id": "tradingview_advanced_chart",
-        "studies": [
-          "RSI@tv-basicstudies",
-          "MASimple@tv-basicstudies"
-        ],
-        "backgroundColor": "rgba(19, 23, 34, 1)",
-        "gridColor": "rgba(30, 41, 59, 1)"
-      }});
-      </script>
-    </div>
-    <!-- TradingView Widget END -->
-    """
+    asset_info = asset_options[selected_asset_name]
+    yf_symbol = asset_info["yf"]
+    tv_symbol = asset_info["tv"]
     
-    components.html(tradingview_html, height=685)
+    desk_mode = c_live2.radio(
+        "Chart Display Mode:",
+        options=["🔮 Live Desk + AI Future Prediction", "📺 TradingView Exchange Widget"],
+        horizontal=True,
+        key="desk_mode_select"
+    )
+    
+    desk_horizon = c_live3.slider("Forecast Days:", min_value=5, max_value=30, value=15, step=5, key="desk_horizon_slider")
+    
+    if desk_mode == "🔮 Live Desk + AI Future Prediction":
+        with st.spinner(f"Fetching real-time quotes for {selected_asset_name}..."):
+            try:
+                df_live = yf.download(yf_symbol, period="6mo", interval="1d")
+                if isinstance(df_live.columns, pd.MultiIndex):
+                    df_live.columns = df_live.columns.get_level_values(0)
+            except Exception as e:
+                st.error(f"Failed to fetch market data: {e}")
+                df_live = pd.DataFrame()
+                
+        if not df_live.empty and 'Close' in df_live.columns:
+            prices = df_live['Close'].values.tolist()
+            dates = df_live.index.strftime('%Y-%m-%d').tolist()
+            n = len(prices)
+            
+            # 1. Technical Indicators
+            sma20 = df_live['Close'].rolling(window=20).mean()
+            sma50 = df_live['Close'].rolling(window=50).mean()
+            
+            # 2. Linear Regression & Sentiment Drift Forecast
+            lookback = min(40, n)
+            y = np.array(prices[-lookback:])
+            x = np.arange(lookback)
+            slope, intercept = np.polyfit(x, y, 1)
+            
+            # Incorporate text sentiment index from current state
+            curr_sentiment = st.session_state.market_history[-1]["sentiment"] if st.session_state.market_history else 0.0
+            sentiment_slope = curr_sentiment * (prices[-1] * 0.003)
+            blended_slope = (0.7 * slope) + (0.3 * sentiment_slope)
+            
+            # Generate future prediction y values
+            pred_steps = np.arange(1, desk_horizon + 1)
+            pred_prices = prices[-1] + blended_slope * pred_steps
+            
+            # Confidence bounds calculation
+            residuals = y - (slope * x + intercept)
+            std_err = np.std(residuals) if len(residuals) > 1 else prices[-1] * 0.01
+            lower_bounds = pred_prices - 1.96 * std_err * np.sqrt(pred_steps)
+            upper_bounds = pred_prices + 1.96 * std_err * np.sqrt(pred_steps)
+            
+            # Future Dates
+            last_date = df_live.index[-1]
+            future_dates = []
+            curr_date = last_date
+            while len(future_dates) < desk_horizon:
+                curr_date += datetime.timedelta(days=1)
+                if curr_date.weekday() < 5:
+                    future_dates.append(curr_date.strftime('%Y-%m-%d'))
+                    
+            # 3. Build Plotly Financial Candlestick + AI Prediction Overlay Chart
+            fig_desk = go.Figure()
+            
+            # Candlesticks
+            fig_desk.add_trace(go.Candlestick(
+                x=dates[-60:],
+                open=df_live['Open'].values[-60:],
+                high=df_live['High'].values[-60:],
+                low=df_live['Low'].values[-60:],
+                close=df_live['Close'].values[-60:],
+                name="Live Candlesticks",
+                increasing_line_color="#10b981",
+                decreasing_line_color="#ef4444"
+            ))
+            
+            # SMA 20 Line
+            fig_desk.add_trace(go.Scatter(
+                x=dates[-60:],
+                y=sma20.values[-60:],
+                name="SMA 20",
+                line=dict(color="#38bdf8", width=1.5)
+            ))
+            
+            # SMA 50 Line
+            fig_desk.add_trace(go.Scatter(
+                x=dates[-60:],
+                y=sma50.values[-60:],
+                name="SMA 50",
+                line=dict(color="#a78bfa", width=1.5)
+            ))
+            
+            # AI Future Prediction Line
+            fig_desk.add_trace(go.Scatter(
+                x=[dates[-1]] + future_dates,
+                y=[prices[-1]] + pred_prices.tolist(),
+                name="AI Future Forecast",
+                line=dict(color="#f59e0b", width=4, dash="dash")
+            ))
+            
+            # Upper Confidence Bound
+            fig_desk.add_trace(go.Scatter(
+                x=[dates[-1]] + future_dates,
+                y=[prices[-1]] + upper_bounds.tolist(),
+                name="Upper Bound",
+                line=dict(color="rgba(245, 158, 11, 0.0)", width=0),
+                showlegend=False
+            ))
+            
+            # Lower Confidence Bound + Fill
+            fig_desk.add_trace(go.Scatter(
+                x=[dates[-1]] + future_dates,
+                y=[prices[-1]] + lower_bounds.tolist(),
+                name="95% Confidence Band",
+                fill="tonexty",
+                fillcolor="rgba(245, 158, 11, 0.15)",
+                line=dict(color="rgba(245, 158, 11, 0.0)", width=0),
+                showlegend=True
+            ))
+            
+            # Vertical NOW Divider Line
+            fig_desk.add_vline(
+                x=dates[-1],
+                line_width=2,
+                line_dash="dot",
+                line_color="#38bdf8",
+                annotation_text="📍 LIVE NOW",
+                annotation_position="top left",
+                annotation_font=dict(color="#38bdf8", size=12, family="Inter")
+            )
+            
+            fig_desk.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color="#94a3b8"),
+                margin=dict(l=20, r=20, t=10, b=20),
+                height=680,
+                xaxis_rangeslider_visible=False,
+                hovermode="x unified",
+                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="right", x=1)
+            )
+            fig_desk.update_xaxes(gridcolor="#1e293b")
+            fig_desk.update_yaxes(gridcolor="#1e293b")
+            
+            st.plotly_chart(fig_desk, use_container_width=True)
+            
+            # Summary Intelligence Card
+            curr_price = prices[-1]
+            target_price = pred_prices[-1]
+            ret_pct = ((target_price - curr_price) / curr_price) * 100
+            
+            signal_color = "#10b981" if ret_pct >= 0 else "#ef4444"
+            signal_label = "BULLISH FORECAST 🚀" if ret_pct >= 0 else "BEARISH FORECAST ⚠️"
+            
+            st.markdown(f"""
+            <div style="background-color: rgba(15, 23, 42, 0.6); border: 1px solid #1e293b; padding: 14px 20px; border-radius: 12px; margin-top: -10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">Current Price:</span> <b style="font-size: 1.1rem; color: #ffffff;">{curr_price:,.2f}</b>
+                    &nbsp;&nbsp;|&nbsp;&nbsp;
+                    <span style="font-size: 0.85rem; color: #94a3b8; font-weight: 600;">AI Target ({desk_horizon}D):</span> <b style="font-size: 1.1rem; color: {signal_color};">{target_price:,.2f} ({ret_pct:+.2f}%)</b>
+                </div>
+                <div>
+                    <span style="background-color: {signal_color}20; color: {signal_color}; border: 1px solid {signal_color}40; padding: 4px 12px; border-radius: 9999px; font-weight: 700; font-size: 0.85rem;">{signal_label}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+    else: # TradingView Widget Mode
+        tradingview_html = f"""
+        <!-- TradingView Widget BEGIN -->
+        <div class="tradingview-widget-container" style="height:680px;width:100%;border-radius:12px;overflow:hidden;border:1px solid #1e293b;box-shadow:0 4px 6px -1px rgba(0,0,0,0.5);">
+          <div id="tradingview_advanced_chart" style="height:100%;width:100%;"></div>
+          <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+          <script type="text/javascript">
+          new TradingView.widget({{
+            "width": "100%",
+            "height": "100%",
+            "symbol": "{tv_symbol}",
+            "interval": "D",
+            "timezone": "Etc/UTC",
+            "theme": "dark",
+            "style": "1",
+            "locale": "en",
+            "toolbar_bg": "#131722",
+            "enable_publishing": false,
+            "hide_side_toolbar": false,
+            "allow_symbol_change": true,
+            "container_id": "tradingview_advanced_chart",
+            "studies": [
+              "RSI@tv-basicstudies",
+              "MASimple@tv-basicstudies"
+            ],
+            "backgroundColor": "rgba(19, 23, 34, 1)",
+            "gridColor": "rgba(30, 41, 59, 1)"
+          }});
+          </script>
+        </div>
+        <!-- TradingView Widget END -->
+        """
+        components.html(tradingview_html, height=685)
+        
     st.divider()
+
     
     # B. Interactive Graphs & Multi-Horizon Future Market Forecasting
     st.markdown("#### 🔮 Multi-Horizon Future Market Prediction & Narrative Trajectory")
