@@ -732,13 +732,14 @@ with tab_narrative:
             fig.add_trace(go.Scatter(
                 x=f_times + f_times[::-1],
                 y=f_upper + f_lower[::-1],
-                fill='todense',
+                fill='toself',
                 fillcolor='rgba(245, 158, 11, 0.12)',
                 line=dict(color='rgba(255,255,255,0)'),
                 hoverinfo="skip",
                 name="95% Confidence Band",
                 yaxis="y2"
             ))
+
             
             # 5. Forecast Sentiment Line
             fig.add_trace(go.Scatter(
