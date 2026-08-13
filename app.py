@@ -757,11 +757,18 @@ with tab_narrative:
                 x=dates[-1],
                 line_width=2,
                 line_dash="dot",
-                line_color="#38bdf8",
-                annotation_text="📍 LIVE NOW",
-                annotation_position="top left",
-                annotation_font=dict(color="#38bdf8", size=12, family="Inter")
+                line_color="#38bdf8"
             )
+            fig_desk.add_annotation(
+                x=dates[-1],
+                y=1.02,
+                yref="paper",
+                text="📍 LIVE NOW",
+                showarrow=False,
+                font=dict(color="#38bdf8", size=12, family="Inter"),
+                xanchor="right"
+            )
+
             
             fig_desk.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
