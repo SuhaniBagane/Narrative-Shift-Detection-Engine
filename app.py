@@ -434,24 +434,56 @@ with st.sidebar:
     st.markdown('<div class="profile-role">Phase III: Advanced NLP & AI Predictor</div>', unsafe_allow_html=True)
     st.divider()
     
-    st.markdown("### 🎙️ Voice Assistant Control")
+    st.markdown("### 🎙️ Voice Assistant & AI Bot")
+    st.markdown("<p style='font-size: 0.8rem; color: #94a3b8; margin-top: -5px;'>Click microphone or type below for 2-way voice conversation.</p>", unsafe_allow_html=True)
     
-    # Render the custom voice assistant component
+    # 1. Custom Voice Assistant Component (Speech Recognition + Audio Speaker)
+    st.markdown("<div style='text-align: center; margin: 8px 0;'>", unsafe_allow_html=True)
     heard_text = voice_assistant(
-        key="voice_assistant_component", 
+        key="sidebar_voice_assistant_component", 
         text_to_speak=st.session_state.voice_speak_text,
         active_tab_to_click=st.session_state.get("active_tab_to_click", "")
     )
+    st.markdown("</div>", unsafe_allow_html=True)
     
-    # Reset voice control states to prevent loops
+    # Reset voice control state flags
     st.session_state.voice_speak_text = ""
     st.session_state.active_tab_to_click = ""
     
-    if heard_text and heard_text != st.session_state.last_heard_text:
+    if heard_text and heard_text != st.session_state.get("last_heard_text", ""):
         st.session_state.last_heard_text = heard_text
         process_voice_command(heard_text)
         
+    # 2. Sidebar 2-Person Speech Dialogue Log
+    st.markdown('<div class="sidebar-chat-stream" style="max-height: 260px; overflow-y: auto; padding: 10px; background: rgba(11, 13, 18, 0.85); border-radius: 10px; border: 1px solid #1e293b; margin: 10px 0;">', unsafe_allow_html=True)
+    if not st.session_state.chat_history:
+        st.markdown('<div style="color: #64748b; font-size: 0.78rem; text-align: center; padding: 15px 0;">🎙️ Speak or type below to begin voice dialogue.</div>', unsafe_allow_html=True)
+    for sender, msg in st.session_state.chat_history[-6:]:
+        if sender == "user":
+            st.markdown(f'<div style="background: rgba(2, 132, 199, 0.2); border: 1px solid rgba(2, 132, 199, 0.4); padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 0.8rem; color: #f1f5f9;"><b>👤 You:</b><br>{msg}</div>', unsafe_allow_html=True)
+        else:
+            st.markdown(f'<div style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.3); padding: 8px 10px; border-radius: 8px; margin-bottom: 6px; font-size: 0.8rem; color: #f1f5f9;"><b>🤖 Voice Bot:</b><br>{msg}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 3. Sidebar Voice Input Form
+    with st.form("sidebar_voice_chat_form", clear_on_submit=True):
+        sidebar_user_input = st.text_input("Ask Voice Bot:", placeholder="e.g. Predict Apple, Market Mood...", key="sidebar_chat_input")
+        submit_sidebar_cmd = st.form_submit_button("🚀 Speak Response", use_container_width=True, type="primary")
+        if submit_sidebar_cmd and sidebar_user_input:
+            process_voice_command(sidebar_user_input)
+            st.rerun()
+            
+    # 4. Quick Trigger Buttons in Sidebar
+    sb_t1, sb_t2 = st.columns(2)
+    if sb_t1.button("🚀 Market Mood", key="sb_trig_mood", use_container_width=True):
+        process_voice_command("What is current market sentiment?")
+        st.rerun()
+    if sb_t2.button("🔮 Predict Tesla", key="sb_trig_predict", use_container_width=True):
+        process_voice_command("Predict Tesla stock")
+        st.rerun()
+        
     st.divider()
+
     
     st.markdown("### 🎛️ Sentiment Calibration")
     st.slider(
@@ -527,154 +559,82 @@ tab_narrative, tab_nlp, tab_ml, tab_chatbot, tab_predict, tab_compare = st.tabs(
 ])
 
 with tab_narrative:
-    # ----------------------------------------------------
-    # UNIFIED TWO-COLUMN LAYOUT: VOICE & CHAT FRAME (LEFT) + MARKET COCKPIT (RIGHT)
-    # ----------------------------------------------------
-    left_frame_col, right_cockpit_col = st.columns([1.1, 2.4])
+    # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
+    st.markdown("### 📊 Market Atmosphere & Indexes")
     
-    with left_frame_col:
-        st.markdown("""
-        <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid #0284c7; padding: 18px; border-radius: 16px; box-shadow: 0 4px 20px rgba(2, 132, 199, 0.15); margin-bottom: 20px;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; border-bottom: 1px solid rgba(56, 189, 248, 0.2); padding-bottom: 10px;">
-                <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 8px;">
-                    🎙️ Voice & AI Chat Assistant
-                </div>
-                <span style="background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; padding: 3px 10px; border-radius: 9999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase;">ONLINE</span>
+    # Calculate Discrepancy Count and Rate
+    discrepancy_count = sum(1 for h in st.session_state.active_headlines_data if h["vader"]["Sentiment Label"] != h["lr"]["Sentiment Label"])
+    discrepancy_rate = discrepancy_count / len(st.session_state.active_headlines_data) if st.session_state.active_headlines_data else 0
+    base_anomaly = {"Panic": 90, "Fear": 60, "Neutral": 15, "Optimistic": 5}.get(curr_phase, 15)
+    added_anomaly = int(discrepancy_rate * 25)
+    anomaly_score = min(base_anomaly + added_anomaly, 100)
+    
+    if anomaly_score < 30:
+        anomaly_color = "#10b981"
+        anomaly_label = "Stable"
+        anomaly_bg = "rgba(16, 185, 129, 0.08)"
+        anomaly_border = "rgba(16, 185, 129, 0.2)"
+        anomaly_emoji = "🟢"
+    elif anomaly_score < 70:
+        anomaly_color = "#f59e0b"
+        anomaly_label = "Volatility"
+        anomaly_bg = "rgba(245, 158, 11, 0.08)"
+        anomaly_border = "rgba(245, 158, 11, 0.2)"
+        anomaly_emoji = "🟡"
+    else:
+        anomaly_color = "#ef4444"
+        anomaly_label = "Systemic Anomaly"
+        anomaly_bg = "rgba(239, 68, 68, 0.08)"
+        anomaly_border = "rgba(239, 68, 68, 0.2)"
+        anomaly_emoji = "🔴"
+
+    kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1, 1, 1.5, 1.5])
+    
+    with kpi_col1:
+        st.metric(
+            label="Nifty 50 Index (Simulated)",
+            value=f"{st.session_state.nifty_val:,.2f}",
+            delta=f"{st.session_state.nifty_change:+.2f}%"
+        )
+        
+    with kpi_col2:
+        st.metric(
+            label="Sensex Index (Simulated)",
+            value=f"{st.session_state.sensex_val:,.2f}",
+            delta=f"{st.session_state.sensex_change:+.2f}%"
+        )
+        
+    with kpi_col3:
+        # Custom styled card for narrative phase
+        st.markdown(f"""
+        <div style="background-color: {phase_style['bg_color']}; border: 1px solid {phase_style['border_color']}; padding: 18px 20px; border-radius: 12px; height: 100px; display: flex; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
+            <div style="font-size: 2.2rem; margin-right: 12px;">{phase_style['emoji']}</div>
+            <div>
+                <div style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; line-height: 1;">Narrative Phase</div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: {phase_style['color']}; margin: 2px 0;">{curr_phase}</div>
+                <div style="font-size: 0.78rem; color: #cbd5e1; font-weight: 400; line-height: 1.1;">Index: {curr_index:+.3f}</div>
             </div>
-            <p style="font-size: 0.82rem; color: #94a3b8; margin-top: 0; margin-bottom: 14px; line-height: 1.4;">
-                Click the microphone to speak or type commands below. The assistant executes page commands, predicts market targets, compares stocks, and speaks answers out loud.
-            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with kpi_col4:
+        # Custom styled card for Market Anomaly Score
+        st.markdown(f"""
+        <div style="background-color: {anomaly_bg}; border: 1px solid {anomaly_border}; padding: 18px 20px; border-radius: 12px; height: 100px; display: flex; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
+            <div style="font-size: 2.2rem; margin-right: 12px;">{anomaly_emoji}</div>
+            <div>
+                <div style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; line-height: 1;">Anomaly Rating</div>
+                <div style="font-size: 1.20rem; font-weight: 800; color: {anomaly_color}; margin: 2px 0;">{anomaly_score}% Risk</div>
+                <div style="font-size: 0.78rem; color: #cbd5e1; font-weight: 400; line-height: 1.1;">State: {anomaly_label}</div>
+            </div>
         </div>
         """, unsafe_allow_html=True)
         
-        # 1. Voice Assistant Custom Component Control
-        st.markdown("<div style='text-align: center; margin-bottom: 15px;'>", unsafe_allow_html=True)
-        frame_heard_text = voice_assistant(
-            key="unified_frame_voice_assistant", 
-            text_to_speak=st.session_state.get("voice_speak_text", ""),
-            active_tab_to_click=st.session_state.get("active_tab_to_click", "")
-        )
-        st.markdown("</div>", unsafe_allow_html=True)
-        
-        # Reset voice control state flags
-        st.session_state.voice_speak_text = ""
-        st.session_state.active_tab_to_click = ""
-        
-        if frame_heard_text and frame_heard_text != st.session_state.get("last_heard_text", ""):
-            st.session_state.last_heard_text = frame_heard_text
-            process_voice_command(frame_heard_text)
-            
-        # 2. Live Integrated Chat Message Stream Box
-        st.markdown('<div class="unified-chat-stream" style="max-height: 520px; overflow-y: auto; padding: 12px; background: rgba(11, 13, 18, 0.8); border-radius: 12px; border: 1px solid #1e293b; margin-bottom: 14px;">', unsafe_allow_html=True)
-        if not st.session_state.chat_history:
-            st.markdown('<div style="color: #64748b; font-size: 0.85rem; text-align: center; padding: 25px 0;">💬 Conversation is empty. Speak or type below to begin.</div>', unsafe_allow_html=True)
-        for sender, msg in st.session_state.chat_history:
-            if sender == "user":
-                st.markdown(f'<div style="background: rgba(2, 132, 199, 0.2); border: 1px solid rgba(2, 132, 199, 0.4); padding: 10px 14px; border-radius: 12px 12px 2px 12px; margin-bottom: 10px; font-size: 0.85rem; color: #f1f5f9; margin-left: 15px;"><b>👤 You:</b><br>{msg}</div>', unsafe_allow_html=True)
-            else:
-                st.markdown(f'<div style="background: rgba(167, 139, 250, 0.15); border: 1px solid rgba(167, 139, 250, 0.3); padding: 10px 14px; border-radius: 12px 12px 12px 2px; margin-bottom: 10px; font-size: 0.85rem; color: #f1f5f9; margin-right: 15px;"><b>🤖 BuzzStreet AI:</b><br>{msg}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # 3. Interactive Input Form inside Frame
-        with st.form("left_frame_chat_input_form", clear_on_submit=True):
-            frame_input_query = st.text_input("Ask Assistant or Type Command:", placeholder="e.g. Predict Apple stock...", key="frame_text_query")
-            submit_frame_cmd = st.form_submit_button("🚀 Execute & Speak Response", use_container_width=True, type="primary")
-            if submit_frame_cmd and frame_input_query:
-                process_voice_command(frame_input_query)
-                st.rerun()
-                
-        # 4. Quick Action Trigger Pills
-        st.markdown("<div style='font-size: 0.85rem; font-weight: 700; color: #94a3b8; margin-top: 10px; margin-bottom: 8px;'>💡 Quick Assistant Triggers:</div>", unsafe_allow_html=True)
-        trig_col1, trig_col2 = st.columns(2)
-        if trig_col1.button("🚀 Market Mood?", key="frame_trig_mood", use_container_width=True):
-            process_voice_command("What is current market sentiment?")
-            st.rerun()
-        if trig_col2.button("🔮 Predict Tesla", key="frame_trig_tesla", use_container_width=True):
-            process_voice_command("Predict Tesla stock")
-            st.rerun()
-        if trig_col1.button("📊 Compare Assets", key="frame_trig_compare", use_container_width=True):
-            process_voice_command("Compare Apple and Tesla")
-            st.rerun()
-        if trig_col2.button("🧠 NLP Pipeline", key="frame_trig_nlp", use_container_width=True):
-            process_voice_command("Show NLP cleaning")
-            st.rerun()
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🔄 Narrative Shift Transition Path")
+    st.markdown(f"💡 **Chrono-Shift Chain:** ` {transition_path} `")
+    st.divider()
 
-    with right_cockpit_col:
-        # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
-        st.markdown("### 📊 Market Atmosphere & Indexes")
-        
-        # Calculate Discrepancy Count and Rate
-        discrepancy_count = sum(1 for h in st.session_state.active_headlines_data if h["vader"]["Sentiment Label"] != h["lr"]["Sentiment Label"])
-        discrepancy_rate = discrepancy_count / len(st.session_state.active_headlines_data) if st.session_state.active_headlines_data else 0
-        base_anomaly = {"Panic": 90, "Fear": 60, "Neutral": 15, "Optimistic": 5}.get(curr_phase, 15)
-        added_anomaly = int(discrepancy_rate * 25)
-        anomaly_score = min(base_anomaly + added_anomaly, 100)
-        
-        if anomaly_score < 30:
-            anomaly_color = "#10b981"
-            anomaly_label = "Stable"
-            anomaly_bg = "rgba(16, 185, 129, 0.08)"
-            anomaly_border = "rgba(16, 185, 129, 0.2)"
-            anomaly_emoji = "🟢"
-        elif anomaly_score < 70:
-            anomaly_color = "#f59e0b"
-            anomaly_label = "Volatility"
-            anomaly_bg = "rgba(245, 158, 11, 0.08)"
-            anomaly_border = "rgba(245, 158, 11, 0.2)"
-            anomaly_emoji = "🟡"
-        else:
-            anomaly_color = "#ef4444"
-            anomaly_label = "Systemic Anomaly"
-            anomaly_bg = "rgba(239, 68, 68, 0.08)"
-            anomaly_border = "rgba(239, 68, 68, 0.2)"
-            anomaly_emoji = "🔴"
-
-        kpi_col1, kpi_col2, kpi_col3, kpi_col4 = st.columns([1, 1, 1.5, 1.5])
-        
-        with kpi_col1:
-            st.metric(
-                label="Nifty 50 Index (Simulated)",
-                value=f"{st.session_state.nifty_val:,.2f}",
-                delta=f"{st.session_state.nifty_change:+.2f}%"
-            )
-            
-        with kpi_col2:
-            st.metric(
-                label="Sensex Index (Simulated)",
-                value=f"{st.session_state.sensex_val:,.2f}",
-                delta=f"{st.session_state.sensex_change:+.2f}%"
-            )
-            
-        with kpi_col3:
-            # Custom styled card for narrative phase
-            st.markdown(f"""
-            <div style="background-color: {phase_style['bg_color']}; border: 1px solid {phase_style['border_color']}; padding: 18px 20px; border-radius: 12px; height: 100px; display: flex; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
-                <div style="font-size: 2.2rem; margin-right: 12px;">{phase_style['emoji']}</div>
-                <div>
-                    <div style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; line-height: 1;">Narrative Phase</div>
-                    <div style="font-size: 1.2rem; font-weight: 800; color: {phase_style['color']}; margin: 2px 0;">{curr_phase}</div>
-                    <div style="font-size: 0.78rem; color: #cbd5e1; font-weight: 400; line-height: 1.1;">Index: {curr_index:+.3f}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with kpi_col4:
-            # Custom styled card for Market Anomaly Score
-            st.markdown(f"""
-            <div style="background-color: {anomaly_bg}; border: 1px solid {anomaly_border}; padding: 18px 20px; border-radius: 12px; height: 100px; display: flex; align-items: center; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.2);">
-                <div style="font-size: 2.2rem; margin-right: 12px;">{anomaly_emoji}</div>
-                <div>
-                    <div style="font-size: 0.72rem; text-transform: uppercase; color: #94a3b8; font-weight: 700; letter-spacing: 0.05em; line-height: 1;">Anomaly Rating</div>
-                    <div style="font-size: 1.20rem; font-weight: 800; color: {anomaly_color}; margin: 2px 0;">{anomaly_score}% Risk</div>
-                    <div style="font-size: 0.78rem; color: #cbd5e1; font-weight: 400; line-height: 1.1;">State: {anomaly_label}</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("#### 🔄 Narrative Shift Transition Path")
-        st.markdown(f"💡 **Chrono-Shift Chain:** ` {transition_path} `")
-        st.divider()
 
     
     # ----------------------------------------------------
