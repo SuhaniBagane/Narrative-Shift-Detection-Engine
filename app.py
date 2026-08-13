@@ -332,39 +332,23 @@ def process_voice_command(command_text):
         st.rerun()
     elif any(k in cmd for k in ["predict", "forecast", "future", "suggestion"]):
         st.session_state.active_tab_to_click = "Predictor"
-        st.session_state.voice_speak_text = "Opening Stock and Trade Future Predictor."
-        
-        # Check if the user specified a ticker to predict, e.g. "predict apple"
-        for word, ticker in [("apple", "AAPL"), ("tesla", "TSLA"), ("microsoft", "MSFT"), ("reliance", "RELIANCE.NS"), ("nifty", "^NSEI"), ("sensex", "^BSESN")]:
+        for word, ticker in [("apple", "AAPL"), ("tesla", "TSLA"), ("microsoft", "MSFT"), ("reliance", "RELIANCE.NS"), ("nvidia", "NVDA"), ("nifty", "^NSEI"), ("sensex", "^BSESN")]:
             if word in cmd:
                 st.session_state.predict_ticker = ticker
-                st.session_state.voice_speak_text = f"Predicting future performance for {word.capitalize()}."
+                st.session_state.voice_speak_text = f"Predicting future market performance for {word.capitalize()}."
                 break
+        else:
+            st.session_state.voice_speak_text = "Opening Stock and Trade Future Predictor."
         st.rerun()
     elif any(k in cmd for k in ["compare", "comparison", "side by side"]):
         st.session_state.active_tab_to_click = "Comparison"
         st.session_state.voice_speak_text = "Opening Multi-Asset Comparison Dashboard."
-        
-        # Check if they named companies to compare, e.g., "compare apple and tesla"
-        detected_tickers = []
-        ticker_map = {
-            "apple": "AAPL", "tesla": "TSLA", "microsoft": "MSFT", 
-            "reliance": "RELIANCE.NS", "nifty": "^NSEI", "sensex": "^BSESN"
-        }
-        for word, ticker in ticker_map.items():
-            if word in cmd:
-                detected_tickers.append(ticker)
-        if len(detected_tickers) >= 2:
-            st.session_state.compare_tickers = detected_tickers[:4] # limit to 4
-            st.session_state.voice_speak_text = f"Comparing performance of " + " and ".join([k.capitalize() for k in ticker_map.keys() if ticker_map[k] in detected_tickers])
         st.rerun()
         
-    # 2. General Queries (Pass to Chatbot directly!)
+    # 2. General Queries & Direct Assistant Questions
     else:
-        st.session_state.active_tab_to_click = "Chatbot"
-        
-        vaders_c = [h["vader"]["compound"] for h in st.session_state.active_headlines_data]
-        lrs_c = [h["lr"] for h in st.session_state.active_headlines_data]
+        vaders_c = [h.get("vader", {}).get("compound", 0.0) for h in st.session_state.active_headlines_data]
+        lrs_c = [h.get("lr", {}) for h in st.session_state.active_headlines_data]
         vader_w = st.session_state.get("vader_weight", 0.50)
         
         composite_idx = narrative_detector.calculate_composite_index(vaders_c, lrs_c, vader_weight=vader_w)
@@ -384,13 +368,19 @@ def process_voice_command(command_text):
         }
         st.session_state.chat_history.append(("user", command_text))
         ans = chatbot.generate_chatbot_response(command_text, ctx)
-        
-        # Clean answer for speech
-        clean_ans = re.sub(r'[\*#`🚨🔮📈🧠💬💻🤖⚙️📊⚖️⚠️]', '', ans)
-        clean_ans = clean_ans.split('\n')[0]
-        st.session_state.voice_speak_text = f"Voice query received. Here is the response: {clean_ans}"
         st.session_state.chat_history.append(("bot", ans))
+        
+        # Clean answer for smooth natural Web Speech voice output
+        clean_ans = re.sub(r'[\*#`🚨🔮📈🧠💬💻🤖⚙️📊⚖️⚠️💡👤$]', '', ans)
+        lines = [line.strip() for line in clean_ans.split('\n') if line.strip()]
+        speech_parts = []
+        for line in lines:
+            if not line.startswith("-") and not line.startswith("1.") and len(line) > 5:
+                speech_parts.append(line)
+        vocal_summary = ". ".join(speech_parts[:2]) if speech_parts else lines[0] if lines else "Command processed."
+        st.session_state.voice_speak_text = vocal_summary
         st.rerun()
+
 
 def handle_quick_prompt(prompt_text):
     process_chat_query(prompt_text)

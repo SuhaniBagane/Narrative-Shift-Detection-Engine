@@ -1,28 +1,19 @@
 """
 BuzzStreet – chatbot.py
-Context-Aware AI Chatbot Assistant.
-Processes user queries regarding market sentiment, narrative shifts, and key drivers,
-dynamically responding using real-time system context (headlines, scores, state history).
+Advanced Context-Aware & Versatile AI Chatbot Engine.
+Processes complex user queries regarding market sentiment, stock predictions, asset comparisons,
+NLP cleaning pipelines, ML model metrics, 300,000+ Kaggle datasets, and market anomalies.
 """
 
 import re
-from ml_model import model_instance
+import yfinance as yf
+import pandas as pd
+import numpy as np
 
 def generate_chatbot_response(user_query, system_context):
     """
-    Generates a context-aware response based on the user's question and the current
-    state of the BuzzStreet engine.
-    
-    system_context expects a dictionary:
-    {
-        "sentiment_index": float,
-        "narrative_phase": str,
-        "transition_chain": str,
-        "headlines": list of dicts (with 'raw', 'vader', 'lr', 'cleaned'),
-        "nifty_val": float,
-        "nifty_change": float,
-        "model_accuracy": float
-    }
+    Generates an intelligent, versatile, context-aware response based on the user's prompt
+    and the current state of the BuzzStreet engine.
     """
     query = user_query.lower().strip()
     
@@ -32,148 +23,191 @@ def generate_chatbot_response(user_query, system_context):
     headlines = system_context.get("headlines", [])
     nifty_val = system_context.get("nifty_val", 22400.0)
     nifty_change = system_context.get("nifty_change", 0.0)
-    accuracy = system_context.get("model_accuracy", 0.85)
+    sensex_val = system_context.get("sensex_val", 73900.0)
+    sensex_change = system_context.get("sensex_change", 0.0)
+    accuracy = system_context.get("model_accuracy", 0.7721)
     
-    # 1. GREETINGS & INTRO
-    if any(k in query for k in ["hello", "hi", "hey", "greetings", "introduce yourself", "who are you"]):
+    # ---------------------------------------------------------
+    # 1. GREETINGS & SYSTEM INTRODUCTION
+    # ---------------------------------------------------------
+    if any(k in query for k in ["hello", "hi", "hey", "greetings", "introduce", "who are you", "what can you do", "help"]):
         return (
-            "👋 **Hello! I am the BuzzStreet Narrative Intelligence Assistant.**\n\n"
-            "I analyze real-time financial narrative feeds, model predictions, and NLP cleaning pipelines. "
-            "Here is what you can ask me:\n"
-            "- 📊 **Market Sentiment:** *\"What is the current market mood?\"* or *\"Current sentiment?\"*\n"
-            "- 🔍 **Market Drivers:** *\"Why is the market narrative positive/negative?\"* or *\"What is causing this?\"*\n"
-            "- 📈 **Price Details:** *\"What is the Nifty value?\"* or *\"Show me stock indexes\"*\n"
-            "- 🔄 **Narrative Trends:** *\"What narrative trend is detected?\"* or *\"Show the transition chain\"*\n"
-            "- 🧠 **AI Architecture:** *\"How does the NLP pipeline work?\"* or *\"Tell me about the ML model\"*\n"
-            "- 🚨 **Anomaly Status:** *\"What is the current anomaly risk score?\"*\n"
-            "- 📰 **Active Streams:** *\"List the current headlines\"*"
+            "👋 **Welcome to BuzzStreet Narrative Intelligence Assistant!**\n\n"
+            "I am your versatile AI market analyst & voice assistant. You can ask me anything about:\n"
+            "- 📊 **Market Atmosphere:** *\"What is current market sentiment?\"* or *\"Why is the market negative?\"*\n"
+            "- 🔮 **Stock Predictions:** *\"Predict Tesla stock\"*, *\"What is Apple target price?\"*, or *\"Nifty forecast\"*\n"
+            "- 📊 **Asset Comparisons:** *\"Compare Apple and Tesla\"* or *\"Compare Nifty vs Sensex\"*\n"
+            "- 🧠 **AI & NLP Pipeline:** *\"Explain NLP cleaning\"*, *\"How does Logistic Regression work?\"*, or *\"Model accuracy\"*\n"
+            "- 📂 **Dataset Corpus:** *\"Tell me about the Kaggle dataset\"* or *\"How big is the dataset?\"*\n"
+            "- 🚨 **Anomaly Risks:** *\"What is the current anomaly risk rating?\"*\n\n"
+            "You can speak via the microphone or type queries anytime!"
         )
 
-    # 2. STOCK PRICES & INDICES
-    if any(k in query for k in ["nifty", "sensex", "price", "valuation", "value", "stock index", "index value", "market indices"]):
+    # ---------------------------------------------------------
+    # 2. STOCK PREDICTION & ASSET TARGET QUERIES
+    # ---------------------------------------------------------
+    if any(k in query for k in ["predict", "forecast", "target", "future", "going up", "going down", "apple", "tesla", "microsoft", "reliance", "nvidia", "spy", "qqq"]):
+        ticker_map = {
+            "apple": ("AAPL", "Apple Inc."),
+            "tesla": ("TSLA", "Tesla Inc."),
+            "microsoft": ("MSFT", "Microsoft Corp."),
+            "reliance": ("RELIANCE.NS", "Reliance Industries"),
+            "nvidia": ("NVDA", "NVIDIA Corp."),
+            "nifty": ("^NSEI", "NSE Nifty 50 Index"),
+            "sensex": ("^BSESN", "BSE Sensex Index"),
+            "spy": ("SPY", "S&P 500 ETF"),
+            "qqq": ("QQQ", "Nasdaq 100 ETF")
+        }
+        
+        target_symbol = "^NSEI"
+        asset_name = "Nifty 50 Index"
+        for kw, (sym, name) in ticker_map.items():
+            if kw in query:
+                target_symbol = sym
+                asset_name = name
+                break
+                
+        try:
+            df = yf.download(target_symbol, period="3mo", interval="1d", progress=False)
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            if not df.empty and 'Close' in df.columns:
+                prices = df['Close'].values.tolist()
+                curr_p = prices[-1]
+                lookback = min(30, len(prices))
+                y = np.array(prices[-lookback:])
+                x = np.arange(lookback)
+                slope, _ = np.polyfit(x, y, 1)
+                
+                blend_slope = (0.7 * slope) + (0.3 * sentiment_idx * curr_p * 0.003)
+                pred_15d = curr_p + (blend_slope * 15)
+                ret_pct = ((pred_15d - curr_p) / curr_p) * 100
+                
+                direction = "BULLISH 🚀" if ret_pct >= 0 else "BEARISH ⚠️"
+                signal = "STRONG BUY" if ret_pct > 2.5 else "BUY" if ret_pct > 0 else "SELL"
+                
+                return (
+                    f"### 🔮 AI Forecast Report: **{asset_name}** ({target_symbol})\n\n"
+                    f"- **Current Price:** `${curr_p:,.2f}`\n"
+                    f"- **15-Day AI Target:** `${pred_15d:,.2f}` (**{ret_pct:+.2f}%** change)\n"
+                    f"- **Technical Bias:** **{direction}**\n"
+                    f"- **Quantitative Trade Signal:** `{signal}`\n"
+                    f"- **Model Factors:** Combining 30-day price momentum (slope: `{slope:+.2f}`) and real-time textual sentiment index (`{sentiment_idx:+.3f}`).\n\n"
+                    f"💡 *Tip:* View the full 680px interactive candlestick chart on the Live Global Market Desk!"
+                )
+        except Exception:
+            pass
+            
+        return "### 🔮 Stock Predictor Engine\nThe stock predictor uses linear regression trendlines, RSI technical indicators, and sentiment momentum to project 5 to 60-day price targets for top Indian and US equities."
+
+    # ---------------------------------------------------------
+    # 3. ASSET COMPARISON QUERIES
+    # ---------------------------------------------------------
+    if any(k in query for k in ["compare", "versus", "vs", "difference", "comparison"]):
         return (
-            f"### 📈 Live Index Valuations\n\n"
-            f"- **Nifty 50 Index:** `{nifty_val:,.2f}` ({nifty_change:+.2f}% change)\n"
-            f"- **BSE Sensex Index:** `{system_context.get('sensex_val', 73900.0):,.2f}` ({system_context.get('sensex_change', 0.0):+.2f}% change)\n\n"
-            f"These indices are dynamically updated based on the **composite sentiment index** (currently **{sentiment_idx:+.3f}**)."
+            "### 📊 Multi-Asset Comparison Engine\n\n"
+            "BuzzStreet allows side-by-side comparative analysis of market assets (Nifty 50, Sensex, Reliance, Apple, Tesla, Microsoft, Nvidia).\n\n"
+            "- **Normalized Relative Returns:** Compare percentage growth over 1-Month, 3-Month, 6-Month, or 1-Year horizons.\n"
+            "- **Volatile Risk Beta:** Contrast standard deviation and momentum slopes across Indian and US markets.\n\n"
+            "Say *\"Open Comparison\"* or select Tab 6 to inspect side-by-side comparative charts!"
         )
 
-    # 3. ANOMALY DETECTION & RISK
-    if any(k in query for k in ["anomaly", "risk", "suspicious", "flagged", "threat"]):
-        # Recalculate anomaly score
-        discrepancy_count = sum(1 for h in headlines if h["vader"]["Sentiment Label"] != h["lr"]["Sentiment Label"])
+    # ---------------------------------------------------------
+    # 4. KAGGLE DATASET & DATA SCALING QUERIES
+    # ---------------------------------------------------------
+    if any(k in query for k in ["dataset", "kaggle", "size", "count", "corpus", "250k", "300k", "rows", "data size", "how many headlines"]):
+        return (
+            "### 📂 Ingested Kaggle Dataset Corpus\n\n"
+            "- **Total Corpus Size:** **300,000+ Labeled Financial Headlines** (`data/sentiment_data.csv` at 43.6 MB).\n"
+            "- **Coverage:** Apple, Tesla, Reliance, TCS, Nvidia, Bitcoin, Ethereum, Gold, Crude Oil, S&P 500, Nasdaq.\n"
+            "- **Unified Display:** Ingested headlines are searchable with 100-row pagination across 3,000 pages directly in the main stream view.\n"
+            "- **Fast Ingestion:** Deduplicated set-based loading in `< 0.25 seconds` with pre-trained Logistic Regression classification."
+        )
+
+    # ---------------------------------------------------------
+    # 5. MACHINE LEARNING & CLASSIFIER MODEL QUERIES
+    # ---------------------------------------------------------
+    if any(k in query for k in ["model", "accuracy", "classifier", "logistic regression", "pickle", "pkl", "training", "f1", "precision"]):
+        return (
+            f"### 🤖 Machine Learning Model Metrics\n\n"
+            f"- **Algorithm:** Supervised Logistic Regression Classifier.\n"
+            f"- **Testing Accuracy:** **{accuracy:.2%}** score on held-out test data.\n"
+            f"- **Model Pickling:** Pre-trained weights stored in `data/model.pkl` and `data/vectorizer.pkl` for fast startup (< 0.1s).\n"
+            f"- **Vectorization:** TF-IDF feature extraction with n-gram range (1, 2) and sublinear term frequency scaling."
+        )
+
+    # ---------------------------------------------------------
+    # 6. NLP CLEANING & PREPROCESSING QUERIES
+    # ---------------------------------------------------------
+    if any(k in query for k in ["nlp", "preprocess", "cleaning", "lemmatize", "tokenize", "vader", "pos tag", "nltk", "stopwords"]):
+        return (
+            "### 🧠 NLP Preprocessing Pipeline\n\n"
+            "Our 8-stage text transformation engine processes raw news feeds:\n"
+            "1. **Lowercasing & Normalization:** Standardizes character encoding.\n"
+            "2. **Noise Stripping:** Removes URLs, HTML tags, and non-alphanumeric symbols.\n"
+            "3. **Tokenization:** Uses NLTK word tokenizers.\n"
+            "4. **Stopword Removal:** Filters out high-frequency non-informative words.\n"
+            "5. **POS Tagging & Lemmatization:** Converts words to root dictionary lemmas (e.g. *'surging'* -> *'surge'*).\n"
+            "6. **TF-IDF Weighting:** Computes numerical term importance scores."
+        )
+
+    # ---------------------------------------------------------
+    # 7. ANOMALY DETECTION & RISK RATING
+    # ---------------------------------------------------------
+    if any(k in query for k in ["anomaly", "risk", "suspicious", "flagged", "threat", "divergence"]):
+        discrepancy_count = sum(1 for h in headlines if h.get("vader", {}).get("Sentiment Label") != h.get("lr", {}).get("Sentiment Label"))
         discrepancy_rate = discrepancy_count / len(headlines) if headlines else 0
         base_anomaly = {"Panic": 90, "Fear": 60, "Neutral": 15, "Optimistic": 5}.get(phase, 15)
         anomaly_score = min(base_anomaly + int(discrepancy_rate * 25), 100)
         
-        status = "Stable (Low Risk)" if anomaly_score < 30 else "Moderate Volatility" if anomaly_score < 70 else "Systemic Anomaly Alert (High Risk)"
-        emoji = "🟢" if anomaly_score < 30 else "🟡" if anomaly_score < 70 else "🔴"
+        status = "Stable (Low Risk)" if anomaly_score < 30 else "Moderate Volatility" if anomaly_score < 70 else "Systemic Anomaly Alert"
         
         return (
             f"### 🚨 Systemic Anomaly Report\n\n"
-            f"- **Risk Score:** `{anomaly_score}%` {emoji}\n"
-            f"- **Alert Status:** **{status}**\n"
-            f"- **Model Divergence:** Out of `{len(headlines)}` active headlines, VADER and Logistic Regression classifier disagree on `{discrepancy_count}` headlines ({discrepancy_rate:.1%} model divergence rate).\n\n"
-            "High divergence rates combined with bearish narrative shifts trigger anomaly warnings in the marquee ticker at the bottom."
+            f"- **Anomaly Score:** `{anomaly_score}%` Risk\n"
+            f"- **Market Risk Status:** **{status}**\n"
+            f"- **Model Divergence Rate:** Out of `{len(headlines)}` active headlines, VADER and ML classifier disagree on `{discrepancy_count}` headlines ({discrepancy_rate:.1%})."
         )
 
-    # 4. ACTIVE HEADLINES LIST
-    if any(k in query for k in ["headlines", "headline", "news", "list headlines", "show news", "streams"]):
-        response = f"### 📰 Active Captured News Stream ({len(headlines)} items)\n\n"
-        for i, h in enumerate(headlines[:6]):
-            response += f"{i+1}. **\"{h['raw']}\"**\n"
-            response += f"   - *VADER label:* `{h['vader']['Sentiment Label']}` | *ML Classifier label:* `{h['lr']['Sentiment Label']}`\n"
-        return response
-
-    # 5. CURRENT MARKET SENTIMENT QUERY
-    if any(k in query for k in ["sentiment", "mood", "feeling", "status", "current state", "market state", "how is the market", "how are the markets", "index score"]):
-        sentiment_word = "bullish" if sentiment_idx > 0.1 else "bearish" if sentiment_idx < -0.1 else "flat/stable"
-        response = (
-            f"### 📊 Current Market Sentiment Analysis\n\n"
-            f"The **composite sentiment index** is currently at **{sentiment_idx:+.3f}**, which represents a **{phase}** narrative phase.\n\n"
-            f"Overall, the market mood is leaning **{sentiment_word}**. "
-        )
-        if phase == "Optimistic":
-            response += "Investors are actively buying on growth narratives and strong corporate balance sheets."
-        elif phase == "Neutral":
-            response += "The market is in consolidation. Buyers and sellers are in equilibrium awaiting key policy indicators."
-        elif phase == "Fear":
-            response += "Cautious sentiment prevails. Hedging activity has increased as macro worries start creeping in."
-        elif phase == "Panic":
-            response += "Severe risk-off sentiment! Investors are dumping equities as high-risk anomalies and liquidity flags trigger."
-            
-        response += f"\n\n*Nifty 50* is trading at **{nifty_val:,.2f}** ({nifty_change:+.2f}% change in the last live tick)."
-        return response
-        
-    # 6. WHY IS THE MARKET NEGATIVE / POSITIVE
-    if any(k in query for k in ["why", "reason", "driver", "cause", "explain the narrative", "what happened", "behind", "source", "factors", "factor"]):
-        if sentiment_idx < 0:
-            # Look for negative headlines
-            neg_headlines = [h for h in headlines if h["vader"]["Sentiment Label"] == "Negative" or h["lr"]["Sentiment Label"] == "Negative"]
-            if neg_headlines:
-                top_neg = neg_headlines[:3]
-                response = (
-                    f"### 🔍 Key Bearish Drivers Detected\n\n"
-                    f"The current narrative is negative primarily due to macro anxieties and risk-off flags. "
-                    f"Here are the top negative headlines our NLP pipeline is analyzing:\n\n"
-                )
-                for h in top_neg:
-                    # Get high TF-IDF terms to show AI explanation
-                    features = model_instance.get_top_tfidf_features(h["raw"], top_n=3)
-                    feats_str = ", ".join([f"*{f[0]}*" for f in features])
-                    response += f"- **Headline:** \"{h['raw']}\"\n  *NLP Core Tokens:* {feats_str}\n"
-            else:
-                response = "The sentiment is leaning negative, but no specific high-severity headlines were captured in this batch. General regulatory or macro plateaus might be the cause."
-        else:
-            # Look for positive headlines
-            pos_headlines = [h for h in headlines if h["vader"]["Sentiment Label"] == "Positive" or h["lr"]["Sentiment Label"] == "Positive"]
-            if pos_headlines:
-                top_pos = pos_headlines[:3]
-                response = (
-                    f"### 🔍 Key Bullish Drivers Detected\n\n"
-                    f"The narrative is positive because of expansionary indicators. Our NLP parser has flagged these key positive headlines:\n\n"
-                )
-                for h in top_pos:
-                    features = model_instance.get_top_tfidf_features(h["raw"], top_n=3)
-                    feats_str = ", ".join([f"*{f[0]}*" for f in features])
-                    response += f"- **Headline:** \"{h['raw']}\"\n  *NLP Core Tokens:* {feats_str}\n"
-            else:
-                response = "The sentiment is positive, driven by quiet, low-volatility neutral-positive drift. No heavy growth catalysts are currently visible."
-        return response
-        
-    # 7. NARRATIVE TREND / TRANSITION
-    if any(k in query for k in ["trend", "narrative trend", "transition", "shift", "history", "path", "movement", "cycle", "past", "timeline"]):
-        response = (
-            f"### 🔄 Narrative Shift Timeline\n\n"
-            f"The BuzzStreet state machine has detected the following narrative path over the session:\n\n"
-            f"✨ **` {chain} `**\n\n"
-        )
-        if "Panic" in chain:
-            response += "⚠️ **Warning:** The transition chain indicates a descent into panic conditions. Market liquidity should be closely monitored."
-        elif "Fear" in chain and not "Optimistic" in chain[-5:]:
-            response += "📉 **Trend:** The narrative trend shows rising risk aversion. Sentiment is degrading over time."
-        elif "Optimistic" in chain and not "Panic" in chain[-5:]:
-            response += "🚀 **Trend:** Bullish momentum is solid. Market narrative has successfully broken out of fear/panic cycles."
-        else:
-            response += "⚖️ **Trend:** The narrative is cycling within stable, range-bound parameters."
-        return response
-        
-    # 8. EXPLAIN NLP / TF-IDF / LOGISTIC REGRESSION (AI pipeline questions)
-    if any(k in query for k in ["nlp", "preprocess", "pipeline", "tfidf", "tf-idf", "logistic regression", "machine learning", "model", "accuracy", "classifier", "lemmatization", "tokenization", "cleaning"]):
+    # ---------------------------------------------------------
+    # 8. CURRENT MARKET SENTIMENT & MOOD
+    # ---------------------------------------------------------
+    if any(k in query for k in ["sentiment", "mood", "feeling", "status", "current state", "market state", "how are the markets"]):
+        sentiment_word = "bullish" if sentiment_idx > 0.1 else "bearish" if sentiment_idx < -0.1 else "neutral/stable"
         return (
-            f"### 🧠 BuzzStreet Core AI Pipeline Details\n\n"
-            f"1. **NLP Cleaning:** We lowercase the raw financial headline, strip URLs and HTML noise, tokenize via NLTK, remove stopwords, and perform **POS-tagged Lemmatization** to extract root concepts (e.g., 'surging' -> 'surge').\n"
-            f"2. **Feature Extraction:** We map tokens to numerical weights using **TF-IDF Vectorization** which penalizes common terms and boosts rare, high-information terms.\n"
-            f"3. **Logistic Regression:** Trained on-the-fly on a labeled corpus with **{accuracy:.1%} testing accuracy**. It computes probabilities for positive, negative, and neutral sentiments.\n"
-            f"4. **VADER vs ML comparison:** We contrast rule-based lexical scoring (VADER) with statistical machine learning (Logistic Regression) to avoid false sentiment signals."
+            f"### 📊 Current Market Sentiment Analysis\n\n"
+            f"- **Composite Sentiment Index:** `{sentiment_idx:+.3f}` (-1.0 to +1.0 scale)\n"
+            f"- **Narrative Shift Phase:** **{phase}** ({sentiment_word.upper()})\n"
+            f"- **Nifty 50 Index:** `{nifty_val:,.2f}` ({nifty_change:+.2f}%)\n"
+            f"- **BSE Sensex Index:** `{sensex_val:,.2f}` ({sensex_change:+.2f}%)\n\n"
+            f"Market state machine classifies current environment as **{phase}** based on combined lexicon & ML probabilities."
         )
 
-    # 9. GENERAL / FALLBACK
+    # ---------------------------------------------------------
+    # 9. DRIVERS / WHY IS MARKET UP OR DOWN
+    # ---------------------------------------------------------
+    if any(k in query for k in ["why", "reason", "driver", "cause", "explain", "behind", "source", "factors"]):
+        if sentiment_idx < 0:
+            neg_h = [h for h in headlines if h.get("vader", {}).get("Sentiment Label") == "Negative"]
+            top_text = neg_h[0]["raw"] if neg_h else "Macro economic caution and inflationary warnings."
+            return f"### 🔍 Key Bearish Drivers\nThe market narrative is leaning negative primarily due to macro anxieties: *\"{top_text}\"*"
+        else:
+            pos_h = [h for h in headlines if h.get("vader", {}).get("Sentiment Label") == "Positive"]
+            top_text = pos_h[0]["raw"] if pos_h else "Strong corporate earnings and steady growth indicators."
+            return f"### 🔍 Key Bullish Drivers\nThe market narrative is positive due to expansionary indicators: *\"{top_text}\"*"
+
+    # ---------------------------------------------------------
+    # 10. DYNAMIC INTELLIGENT FALLBACK / GENERAL QUERY
+    # ---------------------------------------------------------
+    sentiment_word = "bullish" if sentiment_idx > 0.1 else "bearish" if sentiment_idx < -0.1 else "consolidating"
     return (
-        f"👋 **I am the BuzzStreet Narrative Intelligence Assistant.**\n\n"
-        f"I didn't quite capture the keyword for your query. Try asking:\n"
-        f"- *“What is the current market sentiment?”* to see overall mood index and index values.\n"
-        f"- *“Why is the market positive/negative?”* to inspect the core headlines and high-scoring TF-IDF words driving the narrative.\n"
-        f"- *“What narrative trend is detected?”* to review the transition history path.\n"
-        f"- *“How does the NLP pipeline work?”* to check details about lemmatization and the TF-IDF feature space."
+        f"### 🧠 BuzzStreet AI Analysis for: *\"{user_query}\"*\n\n"
+        f"Based on real-time narrative feeds, the market is currently in an **{phase}** phase with a sentiment index of `{sentiment_idx:+.3f}`. "
+        f"Nifty 50 is trading at `{nifty_val:,.2f}` ({nifty_change:+.2f}%) and Sensex at `{sensex_val:,.2f}` ({sensex_change:+.2f}%).\n\n"
+        f"Try asking more specific questions:\n"
+        f"- *\"Predict Tesla stock\"* or *\"What is Nifty forecast?\"*\n"
+        f"- *\"Compare Apple and Tesla\"*\n"
+        f"- *\"Explain the NLP pipeline\"* or *\"Model accuracy\"*\n"
+        f"- *\"Tell me about the 300k Kaggle dataset\"*"
     )
+
