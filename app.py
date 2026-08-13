@@ -442,8 +442,10 @@ with st.sidebar:
     heard_text = voice_assistant(
         key="sidebar_voice_assistant_component", 
         text_to_speak=st.session_state.voice_speak_text,
-        active_tab_to_click=st.session_state.get("active_tab_to_click", "")
+        active_tab_to_click=st.session_state.get("active_tab_to_click", ""),
+        height=95
     )
+
     st.markdown("</div>", unsafe_allow_html=True)
     
     # Reset voice control state flags

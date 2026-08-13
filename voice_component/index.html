@@ -13,31 +13,34 @@
     .mic-btn {
       background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
       color: white;
-      border: none;
-      border-radius: 50%;
-      width: 54px;
-      height: 54px;
-      font-size: 1.5rem;
+      border: 1.5px solid rgba(255, 255, 255, 0.25);
+      border-radius: 25px;
+      padding: 10px 18px;
+      font-size: 0.92rem;
+      font-weight: 700;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.5);
       transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       outline: none;
+      width: 100%;
+      font-family: 'Inter', -apple-system, sans-serif;
     }
     .mic-btn:hover {
-      transform: scale(1.08);
-      box-shadow: 0 6px 16px rgba(2, 132, 199, 0.6);
+      transform: scale(1.03);
+      box-shadow: 0 6px 18px rgba(2, 132, 199, 0.8);
+      background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
     }
     .mic-btn.listening {
       background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-      box-shadow: 0 0 15px #ef4444;
+      box-shadow: 0 0 20px #ef4444;
       animation: pulse 1.5s infinite;
     }
     @keyframes pulse {
       0% { transform: scale(1); }
-      50% { transform: scale(1.08); }
+      50% { transform: scale(1.04); }
       100% { transform: scale(1); }
     }
     .container {
@@ -47,25 +50,29 @@
       font-family: 'Inter', -apple-system, sans-serif;
       color: #e2e8f0;
       gap: 6px;
-      padding: 5px;
+      padding: 2px 5px;
     }
     .status-text {
       font-size: 0.75rem;
       color: #94a3b8;
-      font-weight: 500;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       text-align: center;
-      max-width: 140px;
+      max-width: 180px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      margin-top: 2px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <button class="mic-btn" id="micBtn">🎙️</button>
+    <button class="mic-btn" id="micBtn">
+      <span style="font-size: 1.2rem; margin-right: 6px;">🎙️</span>
+      <span id="btnLabel">Click to Speak</span>
+    </button>
     <div class="status-text" id="status">Voice Standby</div>
   </div>
 
@@ -85,12 +92,14 @@
     const SpeechSynthesis = window.speechSynthesis;
     
     const micBtn = document.getElementById('micBtn');
+    const btnLabel = document.getElementById('btnLabel');
     const status = document.getElementById('status');
     let isListening = false;
     let recognition = null;
 
     if (!SpeechRecognition) {
       status.innerText = "Unsupported Browser";
+      btnLabel.innerText = "Mic Unavailable";
       micBtn.disabled = true;
       micBtn.style.opacity = "0.5";
       micBtn.style.cursor = "not-allowed";
@@ -116,12 +125,14 @@
       recognition.onstart = () => {
         isListening = true;
         micBtn.classList.add('listening');
+        btnLabel.innerText = "Listening...";
         status.innerText = "Listening...";
       };
 
       recognition.onend = () => {
         isListening = false;
         micBtn.classList.remove('listening');
+        btnLabel.innerText = "Click to Speak";
         if (status.innerText === "Listening...") {
           status.innerText = "Voice Standby";
         }
@@ -130,9 +141,11 @@
       recognition.onerror = (event) => {
         console.error("Speech Recognition Error:", event.error);
         status.innerText = "Retry Voice";
+        btnLabel.innerText = "Click to Speak";
         isListening = false;
         micBtn.classList.remove('listening');
       };
+
 
       recognition.onresult = (event) => {
         const resultText = event.results[0][0].transcript;
@@ -158,10 +171,19 @@
       return false;
     }
 
+    function setFrameHeight(h) {
+      window.parent.postMessage({
+        isStreamlitMessage: true,
+        type: "streamlit:setFrameHeight",
+        height: h || 95
+      }, "*");
+    }
+
     // Listen to messages from Streamlit python backend
     window.addEventListener("message", (event) => {
       // Check for render events
-      if (event.data.type === "streamlit:render") {
+      if (event.data && event.data.type === "streamlit:render") {
+        setFrameHeight(95);
         const args = event.data.args;
         if (args) {
           if (args.text_to_speak) {
@@ -176,6 +198,7 @@
               
               utterance.onend = () => {
                 status.innerText = "Voice Standby";
+                setFrameHeight(95);
               };
               
               SpeechSynthesis.cancel();
@@ -198,6 +221,8 @@
       apiVersion: 1
     };
     window.parent.postMessage(readyMessage, "*");
+    setFrameHeight(95);
   </script>
 </body>
 </html>
+
