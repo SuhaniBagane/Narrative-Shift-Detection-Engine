@@ -38,9 +38,8 @@ def predict_lr_sentiment(text, vectorizer, lr_model):
     """
     Predicts sentiment probabilities for a headline using TF-IDF + Logistic Regression.
     """
-    from nlp_pipeline import preprocess_headline_detailed
-    p_res = preprocess_headline_detailed(text)
-    clean_str = " ".join(p_res["clean_tokens"])
+    from nlp_pipeline import preprocess_text
+    clean_str = preprocess_text(text)
     vec = vectorizer.transform([clean_str])
     probs = lr_model.predict_proba(vec)[0]
     classes = list(lr_model.classes_)
