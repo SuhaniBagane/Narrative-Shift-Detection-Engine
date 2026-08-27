@@ -74,14 +74,14 @@ def verify_otp(entered_otp):
     entered = str(entered_otp).strip()
     stored = str(st.session_state.current_otp).strip()
     
-    # Valid if exact match or if user entered a valid 6-digit numeric OTP
-    if entered == stored or (len(entered) == 6 and entered.isdigit()):
+    # STRICT EXACT MATCH ENFORCEMENT
+    if entered == stored:
         st.session_state.authenticated = True
         st.session_state.otp_sent = False
         st.session_state.current_otp = None
         return True, "✅ OTP Verified Successfully! Welcome to BuzzStreet."
     else:
-        return False, "❌ Invalid 6-digit OTP code entered. Please check and try again."
+        return False, "❌ Incorrect OTP code entered! Access denied. You must enter the exact 6-digit OTP code sent to your phone/email."
 
 def logout_user():
     """Logs out the current user and clears session state."""
@@ -159,20 +159,23 @@ def render_login_screen():
             rem_s = remaining_sec % 60
             
             st.markdown(f"""
-            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 10px; padding: 12px 16px; margin-bottom: 15px;">
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 10px; padding: 14px 18px; margin-bottom: 15px;">
                 <div style="font-size: 0.85rem; color: #34d399; font-weight: 700;">
-                    📲 Verification Code Dispatched
+                    📲 SMS / Email Security Gateway Dispatch
                 </div>
                 <div style="font-size: 0.95rem; color: #ffffff; margin-top: 4px;">
-                    A 6-digit Security OTP has been dispatched to <b>{st.session_state.login_identifier}</b>. Please check your mobile SMS inbox or email messages.
+                    A 6-digit Security OTP has been dispatched to <b>{st.session_state.login_identifier}</b>.
                 </div>
-                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">
-                    ⏱️ Validity Remaining: <b>{rem_min:02d}:{rem_s:02d}</b> (Strict 10-Minute Expiry Rule)
+                <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 8px; background: rgba(15, 23, 42, 0.9); padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); display: inline-block;">
+                    🔑 Dispatched Security OTP: <span style="color: #34d399; font-family: monospace; letter-spacing: 3px;">{st.session_state.current_otp}</span>
+                </div>
+                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px;">
+                    ⏱️ Validity Remaining: <b>{rem_min:02d}:{rem_s:02d}</b> (Strict 10-Minute Expiry Rule & Exact Match Requirement)
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            entered_otp = st.text_input("Enter 6-Digit OTP Code:", max_chars=6, placeholder="e.g. 123456", key="auth_otp_input_field")
+            entered_otp = st.text_input("Enter 6-Digit OTP Code:", max_chars=6, placeholder="e.g. 784912", key="auth_otp_input_field")
             
             col_v1, col_v2 = st.columns([2, 1])
             with col_v1:
