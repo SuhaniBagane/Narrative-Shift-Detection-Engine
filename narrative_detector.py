@@ -6,6 +6,57 @@ Tracks aggregate sentiment trends and classifies market narrative phases
 Formats narrative transition paths.
 """
 
+from nltk.sentiment.vader import SentimentIntensityAnalyzer
+
+# Global VADER instance
+try:
+    _sia_instance = SentimentIntensityAnalyzer()
+except Exception:
+    import nltk
+    nltk.download('vader_lexicon', quiet=True)
+    _sia_instance = SentimentIntensityAnalyzer()
+
+def analyze_vader_sentiment(text):
+    """
+    Computes VADER polarity scores for a given headline.
+    """
+    scores = _sia_instance.polarity_scores(text)
+    compound = scores['compound']
+    if compound >= 0.05:
+        label = "Positive"
+    elif compound <= -0.05:
+        label = "Negative"
+    else:
+        label = "Neutral"
+    return {
+        "Compound Score": round(compound, 4),
+        "Sentiment Label": label,
+        "Scores": scores
+    }
+
+def predict_lr_sentiment(text, vectorizer, lr_model):
+    """
+    Predicts sentiment probabilities for a headline using TF-IDF + Logistic Regression.
+    """
+    from nlp_pipeline import preprocess_headline_detailed
+    p_res = preprocess_headline_detailed(text)
+    clean_str = " ".join(p_res["clean_tokens"])
+    vec = vectorizer.transform([clean_str])
+    probs = lr_model.predict_proba(vec)[0]
+    classes = list(lr_model.classes_)
+    prob_dict = dict(zip(classes, probs))
+    
+    pos_p = prob_dict.get("Positive", 0.0)
+    neg_p = prob_dict.get("Negative", 0.0)
+    max_label = max(prob_dict, key=prob_dict.get)
+    
+    return {
+        "Positive Prob": pos_p,
+        "Negative Prob": neg_p,
+        "Sentiment Label": max_label,
+        "Probabilities": prob_dict
+    }
+
 def detect_narrative_phase(sentiment_index):
     """
     Classifies the current market mood based on the composite Sentiment Index.

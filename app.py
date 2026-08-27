@@ -1093,7 +1093,7 @@ with tab_narrative:
         if sim_headline:
             # Perform instant dual-model inference
             v_res = narrative_detector.analyze_vader_sentiment(sim_headline)
-            lr_res = narrative_detector.predict_lr_sentiment(sim_headline, vectorizer, lr_model)
+            lr_res = narrative_detector.predict_lr_sentiment(sim_headline, model_instance.vectorizer, model_instance.model)
             
             v_score = v_res["Compound Score"]
             lr_score = lr_res["Positive Prob"] - lr_res["Negative Prob"]
