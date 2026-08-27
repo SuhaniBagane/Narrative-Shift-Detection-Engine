@@ -574,6 +574,23 @@ st.markdown('<h1 class="main-title">BuzzStreet</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">A Narrative Shift Detection Engine</p>', unsafe_allow_html=True)
 st.markdown('<span class="milestone-badge">Phase II Milestone (50% Completion Review)</span>', unsafe_allow_html=True)
 
+# Extract global state variables for all tabs safely
+if st.session_state.get("market_history"):
+    curr_composite = st.session_state.market_history[-1]["sentiment"]
+    curr_phase = st.session_state.market_history[-1]["phase"]
+else:
+    curr_composite = 0.0
+    curr_phase = "Neutral"
+
+composite_index = curr_composite
+current_phase = curr_phase
+
+discrepancy_count = sum(1 for h in st.session_state.get("active_headlines_data", []) if h["vader"]["Sentiment Label"] != h["lr"]["Sentiment Label"])
+discrepancy_rate = discrepancy_count / len(st.session_state.active_headlines_data) if st.session_state.get("active_headlines_data") else 0
+base_anomaly = {"Panic": 90, "Fear": 60, "Neutral": 15, "Optimistic": 5}.get(curr_phase, 15)
+added_anomaly = int(discrepancy_rate * 25)
+anomaly_score = min(base_anomaly + added_anomaly, 100)
+
 # ----------------------------------------------------
 # TABULAR LAYOUT FOR COCKPIT SECTIONS
 # ----------------------------------------------------
@@ -594,13 +611,6 @@ tab_live, tab_nlp, tab_ml, tab_intel, tab_forecast, tab_corr, tab_portfolio, tab
 with tab_live:
     # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
     st.markdown("### 📊 Market Atmosphere & Indexes")
-    
-    # Calculate Discrepancy Count and Rate
-    discrepancy_count = sum(1 for h in st.session_state.active_headlines_data if h["vader"]["Sentiment Label"] != h["lr"]["Sentiment Label"])
-    discrepancy_rate = discrepancy_count / len(st.session_state.active_headlines_data) if st.session_state.active_headlines_data else 0
-    base_anomaly = {"Panic": 90, "Fear": 60, "Neutral": 15, "Optimistic": 5}.get(curr_phase, 15)
-    added_anomaly = int(discrepancy_rate * 25)
-    anomaly_score = min(base_anomaly + added_anomaly, 100)
     
     if anomaly_score < 30:
         anomaly_color = "#10b981"
