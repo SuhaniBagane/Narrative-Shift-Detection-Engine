@@ -201,3 +201,15 @@ def fetch_live_indices_yfinance():
         # Default fallback values
         return 22420.00, 0.00, 73910.00, 0.00
 
+def get_full_dataset():
+    """Constructs a pandas DataFrame containing all headlines and sentiment labels from NEWS_POOL."""
+    import pandas as pd
+    rows = []
+    for label, headlines in NEWS_POOL.items():
+        for h in headlines:
+            rows.append({
+                "Headline Stream": h,
+                "Sentiment Label": label
+            })
+    return pd.DataFrame(rows)
+
