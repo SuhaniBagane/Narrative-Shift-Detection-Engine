@@ -2067,7 +2067,7 @@ with tab_intel:
             Neutral ➔ {curr_phase}
         </div>
         <div style="font-size: 1rem; color: #cbd5e1; margin-top: 8px;">
-            Composite Shift: <b>{curr_composite:+.4f}</b> &nbsp;|&nbsp; Shift Magnitude: <b>{-0.33 if curr_phase in ['Fear', 'Panic'] else +0.25:+.2f}</b> &nbsp;|&nbsp; Confidence: <b>91.5%</b> &nbsp;|&nbsp; Model Agreement: <b>94.2%</b>
+            Composite Shift: <b>{composite_index:+.4f}</b> &nbsp;|&nbsp; Shift Magnitude: <b>{-0.33 if curr_phase in ['Fear', 'Panic'] else +0.25:+.2f}</b> &nbsp;|&nbsp; Confidence: <b>91.5%</b> &nbsp;|&nbsp; Model Agreement: <b>94.2%</b>
         </div>
     </div>
     """, unsafe_allow_html=True)
