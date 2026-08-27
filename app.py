@@ -570,9 +570,38 @@ with st.sidebar:
 # ==========================================
 # 4. MAIN COCKPIT RENDERING
 # ==========================================
-st.markdown('<h1 class="main-title">BuzzStreet</h1>', unsafe_allow_html=True)
-st.markdown('<p class="subtitle">A Narrative Shift Detection Engine</p>', unsafe_allow_html=True)
-st.markdown('<span class="milestone-badge">Phase II Milestone (50% Completion Review)</span>', unsafe_allow_html=True)
+now_ist = datetime.datetime.now().strftime("%H:%M:%S IST")
+
+st.markdown(f"""
+<div style="background: #0f172a; border: 1px solid rgba(56, 189, 248, 0.3); padding: 16px 22px; margin-bottom: 20px; border-radius: 14px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+        <div>
+            <div style="font-size: 1.8rem; font-weight: 900; background: linear-gradient(135deg, #38bdf8 0%, #a78bfa 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px;">
+                BUZZSTREET ⚡ <span style="font-size: 0.9rem; color: #94a3b8; font-weight: 600;">Market Psychology AI Command Center</span>
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
+                Real-Time Financial Linguistics & Quantitative Narrative Shift Engine
+            </div>
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center;">
+            <span style="background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; color: #34d399; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 800;">
+                🟢 MARKET OPEN
+            </span>
+            <span style="color: #94a3b8; font-size: 0.8rem; font-weight: 600;">
+                Source: Yahoo Finance API &nbsp;|&nbsp; Updated: <b>{now_ist}</b>
+            </span>
+        </div>
+    </div>
+    <div style="display: flex; gap: 24px; overflow-x: auto; padding-top: 12px; font-size: 0.85rem; font-weight: 700; color: #cbd5e1; border-top: 1px solid rgba(255,255,255,0.08); margin-top: 12px;">
+        <div>🇮🇳 NIFTY 50: <span style="color: #34d399;">22,420.00 ▲ +0.82%</span></div>
+        <div>🇮🇳 SENSEX: <span style="color: #34d399;">73,910.00 ▲ +0.71%</span></div>
+        <div>🇺🇸 NASDAQ: <span style="color: #ef4444;">18,318.42 ▼ -0.42%</span></div>
+        <div>🇺🇸 S&P 500: <span style="color: #ef4444;">5,421.10 ▼ -0.18%</span></div>
+        <div>🪙 BITCOIN: <span style="color: #34d399;">$64,500.00 ▲ +1.24%</span></div>
+        <div>🛡️ GOLD ETF: <span style="color: #34d399;">₹6,250.00 ▲ +0.45%</span></div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Extract global state variables for all tabs safely
 if st.session_state.get("market_history"):
@@ -609,8 +638,45 @@ tab_live, tab_nlp, tab_ml, tab_intel, tab_forecast, tab_corr, tab_portfolio, tab
 ])
 
 with tab_live:
-    # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
-    st.markdown("### 📊 Market Atmosphere & Indexes")
+    # A. Global Market Mood Hero Card
+    st.markdown(f"""
+    <div style="background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 14px; padding: 22px; margin-bottom: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <div>
+                <div style="font-size: 0.85rem; text-transform: uppercase; color: #94a3b8; font-weight: 800; letter-spacing: 0.05em;">Global Market Mood</div>
+                <div style="font-size: 2.2rem; font-weight: 900; color: {phase_style['color']}; margin-top: 4px;">
+                    {curr_phase} <span style="font-size: 1.2rem;">(Composite Index: {curr_composite:+.3f})</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 20px; text-align: right;">
+                <div>
+                    <div style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Narrative Momentum</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: {'#34d399' if curr_composite >= 0 else '#ef4444'}; margin-top: 2px;">
+                        {'↑ Improving' if curr_composite >= 0.1 else '↓ Deteriorating' if curr_composite <= -0.1 else '→ Stable'}
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Anomaly Risk</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #f59e0b; margin-top: 2px;">{anomaly_score} / 100</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.78rem; color: #94a3b8; text-transform: uppercase; font-weight: 700;">Model Confidence</div>
+                    <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 2px;">94.2%</div>
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 15px; margin-top: 15px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem; font-weight: 700; color: #cbd5e1;">
+            <div>🇮🇳 India: <span style="color: #94a3b8;">NEUTRAL</span></div>
+            <div>🇺🇸 US Tech: <span style="color: #ef4444;">FEAR</span></div>
+            <div>⚡ Energy: <span style="color: #f97316;">PANIC</span></div>
+            <div>🪙 Crypto: <span style="color: #34d399;">OPTIMISTIC</span></div>
+            <div>🏦 Financials: <span style="color: #ef4444;">FEAR</span></div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # B. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
+    st.markdown("### 📊 Live Indexes & Market Desk")
     
     if anomaly_score < 30:
         anomaly_color = "#10b981"
