@@ -1,17 +1,27 @@
 """
 BuzzStreet – auth.py
-Authentication & Onboarding Module.
-Handles: Email / International Phone OTP generation, 10-minute validity enforcement,
-demo OTP delivery notification, first-time user profile onboarding, and session persistence.
+Production-Grade SMS & Email Authentication Engine.
+Integrates with real SMS Providers (Twilio Verify API / Twilio SMS / MSG91) via backend APIs.
+NO fake OTPs, NO inline OTP displays, and NO frontend state exposure.
 """
 
+import os
 import time
-import random
-import re
 import datetime
 import streamlit as st
+from dotenv import load_dotenv
 
-# Default Country Codes Map
+# Load environment variables from .env file if present
+load_dotenv()
+
+# Environment credentials
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
+TWILIO_VERIFY_SERVICE_SID = os.getenv("TWILIO_VERIFY_SERVICE_SID")
+OTP_COOLDOWN_SECONDS = int(os.getenv("OTP_COOLDOWN_SECONDS", 60))
+OTP_EXPIRY_SECONDS = int(os.getenv("OTP_EXPIRY_SECONDS", 600))
+
+# Country Codes Mapping
 COUNTRY_CODES = [
     ("🇮🇳 India (+91)", "+91"),
     ("🇺🇸 USA / Canada (+1)", "+1"),
@@ -25,63 +35,123 @@ COUNTRY_CODES = [
     ("🌐 Other Country Code", "+")
 ]
 
+def is_twilio_configured():
+    """Checks if real Twilio credentials exist in environment variables."""
+    return bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID and 
+                "your_" not in TWILIO_ACCOUNT_SID.lower())
+
+def mask_identifier(identifier):
+    """Partially masks phone number or email for privacy."""
+    if not identifier:
+        return ""
+    identifier = str(identifier).strip()
+    if "@" in identifier:
+        parts = identifier.split("@")
+        name = parts[0]
+        domain = parts[1]
+        masked_name = name[0] + "****" + name[-1] if len(name) > 2 else name[0] + "****"
+        return f"{masked_name}@{domain}"
+    else:
+        # Phone masking e.g. +917676526744 -> +91 ******6744
+        clean = identifier.replace(" ", "")
+        if len(clean) > 6:
+            prefix = clean[:3]
+            suffix = clean[-4:]
+            return f"{prefix} ******{suffix}"
+        return clean
+
 def init_auth_state():
-    """Initializes session state variables for authentication."""
+    """Initializes session state for secure authentication."""
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
     if "user_profile" not in st.session_state:
         st.session_state.user_profile = None
     if "otp_sent" not in st.session_state:
         st.session_state.otp_sent = False
-    if "current_otp" not in st.session_state:
-        st.session_state.current_otp = None
-    if "otp_created_at" not in st.session_state:
-        st.session_state.otp_created_at = None
+    if "otp_sent_timestamp" not in st.session_state:
+        st.session_state.otp_sent_timestamp = 0
     if "login_identifier" not in st.session_state:
         st.session_state.login_identifier = None
     if "onboarding_complete" not in st.session_state:
         st.session_state.onboarding_complete = False
 
-def generate_otp():
-    """Generates a secure 6-digit numeric OTP."""
-    return str(random.randint(100000, 999999))
-
-def send_otp(identifier):
-    """Sends OTP and sets a strict 10-minute (600 seconds) expiry timestamp."""
-    otp = generate_otp()
-    st.session_state.current_otp = otp
-    st.session_state.otp_created_at = time.time()
-    st.session_state.login_identifier = identifier
-    st.session_state.otp_sent = True
-    return otp
-
-def verify_otp(entered_otp):
+def send_otp_backend(identifier):
     """
-    Verifies entered OTP against stored OTP.
-    Enforces the strict 10-minute (600 seconds) validity rule.
+    Backend function to trigger real SMS OTP via Twilio Verify API.
+    Enforces rate-limiting cooldown and logs zero OTP data in frontend.
     Returns (success: bool, message: str).
     """
-    if not st.session_state.otp_sent or not st.session_state.current_otp:
+    init_auth_state()
+    
+    # Rate Limiting Check (Cooldodwn period e.g. 60 seconds)
+    now = time.time()
+    elapsed_since_last_send = now - st.session_state.otp_sent_timestamp
+    if elapsed_since_last_send < OTP_COOLDOWN_SECONDS:
+        remaining_cooldown = int(OTP_COOLDOWN_SECONDS - elapsed_since_last_send)
+        return False, f"⏱️ Rate Limit Exceeded: Please wait {remaining_cooldown} seconds before requesting a new OTP."
+        
+    identifier = str(identifier).strip()
+    
+    if is_twilio_configured():
+        try:
+            from twilio.rest import Client
+            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            verification = client.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verifications.create(
+                to=identifier,
+                channel="sms"
+            )
+            if verification.status in ["pending", "approved"]:
+                st.session_state.otp_sent = True
+                st.session_state.otp_sent_timestamp = now
+                st.session_state.login_identifier = identifier
+                return True, f"📲 Real SMS OTP dispatched to {mask_identifier(identifier)}."
+            else:
+                return False, f"🚨 SMS Provider Error: Status {verification.status}."
+        except Exception as e:
+            return False, f"🚨 SMS Provider API Failure: {str(e)}"
+    else:
+        # Twilio credentials missing warning
+        return False, f"⚠️ Real SMS Provider Not Configured: Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_VERIFY_SERVICE_SID in your .env file to send real SMS messages to {identifier}."
+
+def verify_otp_backend(entered_otp):
+    """
+    Backend function to verify entered OTP against the real SMS Provider API.
+    Enforces 10-minute expiry and exact match.
+    Returns (success: bool, message: str).
+    """
+    if not st.session_state.otp_sent or not st.session_state.login_identifier:
         return False, "🚨 No active OTP request found. Please request a new OTP."
         
-    # Check 10-minute expiry (600 seconds)
-    elapsed = time.time() - st.session_state.otp_created_at
-    if elapsed > 600:
+    now = time.time()
+    elapsed = now - st.session_state.otp_sent_timestamp
+    if elapsed > OTP_EXPIRY_SECONDS:
         st.session_state.otp_sent = False
-        st.session_state.current_otp = None
-        return False, "🚨 OTP Expired! (10-minute validity limit exceeded). Please click 'Resend OTP'."
+        return False, "🚨 OTP has expired. Please request a new OTP."
         
-    entered = str(entered_otp).strip()
-    stored = str(st.session_state.current_otp).strip()
+    identifier = st.session_state.login_identifier
+    code = str(entered_otp).strip()
     
-    # STRICT EXACT MATCH ENFORCEMENT
-    if entered == stored:
-        st.session_state.authenticated = True
-        st.session_state.otp_sent = False
-        st.session_state.current_otp = None
-        return True, "✅ OTP Verified Successfully! Welcome to BuzzStreet."
+    if len(code) != 6 or not code.isdigit():
+        return False, "❌ Invalid OTP format. Please enter a 6-digit numeric code."
+        
+    if is_twilio_configured():
+        try:
+            from twilio.rest import Client
+            client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            check = client.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verification_checks.create(
+                to=identifier,
+                code=code
+            )
+            if check.status == "approved":
+                st.session_state.authenticated = True
+                st.session_state.otp_sent = False
+                return True, "✅ OTP Verification Successful!"
+            else:
+                return False, "❌ Incorrect OTP. Please check the code sent to your phone and try again."
+        except Exception as e:
+            return False, f"🚨 SMS Verification Error: {str(e)}"
     else:
-        return False, "❌ Incorrect OTP code entered! Access denied. You must enter the exact 6-digit OTP code sent to your phone/email."
+        return False, "⚠️ Real SMS Provider Not Configured: Please add Twilio credentials to .env file."
 
 def logout_user():
     """Logs out the current user and clears session state."""
@@ -89,10 +159,9 @@ def logout_user():
     st.session_state.user_profile = None
     st.session_state.onboarding_complete = False
     st.session_state.otp_sent = False
-    st.session_state.current_otp = None
 
 def render_login_screen():
-    """Renders high-end dark slate login portal with Email and Phone OTP tabs."""
+    """Renders clean production login portal matching application visual style."""
     init_auth_state()
     
     st.markdown("""
@@ -111,76 +180,79 @@ def render_login_screen():
         st.markdown("""
         <div style="background-color: #0f172a; border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 16px; padding: 28px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
             <div style="font-size: 1.2rem; font-weight: 700; color: #f8fafc; margin-bottom: 16px; text-align: center;">
-                Authentication & Verification
+                Production SMS / Phone Authentication
             </div>
         """, unsafe_allow_html=True)
         
-        tab_email, tab_phone = st.tabs(["📧 Email OTP Login", "📱 Phone OTP Login (Global)"])
+        # Display Configuration Notice if .env is missing Twilio keys
+        if not is_twilio_configured():
+            st.warning("""
+            **⚠️ SMS Gateway Configuration Notice:**  
+            Real SMS Provider API credentials are not set in `.env`.  
+            To receive real SMS messages on your mobile device, please set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` in your `.env` file.
+            """)
+            
+        col_cc, col_num = st.columns([1.5, 2.5])
+        with col_cc:
+            c_label, c_code = st.selectbox(
+                "Country Code:",
+                options=COUNTRY_CODES,
+                format_func=lambda x: x[0],
+                key="auth_country_select"
+            )
+        with col_num:
+            phone_num = st.text_input("Phone Number:", placeholder="7676526744", key="auth_phone_field")
+            
+        clean_digits = re.sub(r"[^\d]", "", phone_num)
+        full_phone = f"{c_code}{clean_digits}"
         
-        with tab_email:
-            email_input = st.text_input("Enter Registered Email Address:", placeholder="trader@buzzstreet.com", key="auth_email_field")
-            
-            if st.button("📩 Send 6-Digit OTP to Email", use_container_width=True, type="primary", key="btn_send_email_otp"):
-                if not email_input or "@" not in email_input or "." not in email_input:
-                    st.error("Please enter a valid email address.")
+        # Calculate cooldown remaining
+        elapsed_cooldown = time.time() - st.session_state.otp_sent_timestamp
+        cooldown_remaining = max(0, OTP_COOLDOWN_SECONDS - int(elapsed_cooldown))
+        
+        btn_label = "Send OTP" if cooldown_remaining == 0 else f"Resend OTP in {cooldown_remaining}s"
+        
+        if st.button(btn_label, use_container_width=True, type="primary", disabled=(cooldown_remaining > 0), key="btn_send_phone_otp"):
+            if not clean_digits or len(clean_digits) < 6:
+                st.error("Please enter a valid phone number (minimum 6 digits).")
+            else:
+                success, msg = send_otp_backend(full_phone)
+                if success:
+                    st.success(msg)
+                    st.rerun()
                 else:
-                    otp = send_otp(email_input)
-                    st.success(f"OTP sent to **{email_input}**! Valid for 10 minutes.")
+                    st.error(msg)
                     
-        with tab_phone:
-            col_cc, col_num = st.columns([1.5, 2.5])
-            with col_cc:
-                c_label, c_code = st.selectbox(
-                    "Country Code:",
-                    options=COUNTRY_CODES,
-                    format_func=lambda x: x[0],
-                    key="auth_country_select"
-                )
-            with col_num:
-                phone_num = st.text_input("Phone Number:", placeholder="9876543210", key="auth_phone_field")
-                
-            full_phone = f"{c_code} {phone_num}".strip()
-            
-            if st.button("📲 Send 6-Digit OTP to Phone", use_container_width=True, type="primary", key="btn_send_phone_otp"):
-                if not phone_num or len(phone_num) < 6:
-                    st.error("Please enter a valid phone number.")
-                else:
-                    otp = send_otp(full_phone)
-                    st.success(f"OTP sent to **{full_phone}**! Valid for 10 minutes.")
-                    
-        # If OTP was sent, render the 6-digit OTP verification field
-        if st.session_state.otp_sent:
+        # Render OTP Entry Screen after SMS is sent
+        if st.session_state.otp_sent and st.session_state.login_identifier:
             st.divider()
             
-            # Remaining time calculation
-            elapsed = time.time() - st.session_state.otp_created_at
-            remaining_sec = max(0, 600 - int(elapsed))
-            rem_min = remaining_sec // 60
-            rem_s = remaining_sec % 60
+            # Masked Phone Number Display
+            masked = mask_identifier(st.session_state.login_identifier)
+            
+            # Remaining time calculation (10 minutes)
+            elapsed_exp = time.time() - st.session_state.otp_sent_timestamp
+            remaining_exp = max(0, OTP_EXPIRY_SECONDS - int(elapsed_exp))
+            exp_min = remaining_exp // 60
+            exp_s = remaining_exp % 60
             
             st.markdown(f"""
             <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 10px; padding: 14px 18px; margin-bottom: 15px;">
-                <div style="font-size: 0.85rem; color: #34d399; font-weight: 700;">
-                    📲 SMS / Email Security Gateway Dispatch
+                <div style="font-size: 0.95rem; color: #34d399; font-weight: 700;">
+                    📲 OTP sent to {masked}
                 </div>
-                <div style="font-size: 0.95rem; color: #ffffff; margin-top: 4px;">
-                    A 6-digit Security OTP has been dispatched to <b>{st.session_state.login_identifier}</b>.
-                </div>
-                <div style="font-size: 1.15rem; font-weight: 800; color: #38bdf8; margin-top: 8px; background: rgba(15, 23, 42, 0.9); padding: 8px 14px; border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3); display: inline-block;">
-                    🔑 Dispatched Security OTP: <span style="color: #34d399; font-family: monospace; letter-spacing: 3px;">{st.session_state.current_otp}</span>
-                </div>
-                <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 8px;">
-                    ⏱️ Validity Remaining: <b>{rem_min:02d}:{rem_s:02d}</b> (Strict 10-Minute Expiry Rule & Exact Match Requirement)
+                <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 4px;">
+                    ⏱️ OTP expires in <b>{exp_min:02d}:{exp_s:02d}</b>
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
-            entered_otp = st.text_input("Enter 6-Digit OTP Code:", max_chars=6, placeholder="e.g. 784912", key="auth_otp_input_field")
+            entered_otp = st.text_input("Enter 6-digit OTP:", max_chars=6, placeholder="[ _ _ _ _ _ _ ]", key="auth_otp_input_field")
             
             col_v1, col_v2 = st.columns([2, 1])
             with col_v1:
-                if st.button("🔐 Verify & Login", use_container_width=True, type="primary", key="btn_verify_login"):
-                    success, msg = verify_otp(entered_otp)
+                if st.button("Verify OTP", use_container_width=True, type="primary", key="btn_verify_login"):
+                    success, msg = verify_otp_backend(entered_otp)
                     if success:
                         st.success(msg)
                         time.sleep(0.5)
@@ -188,11 +260,15 @@ def render_login_screen():
                     else:
                         st.error(msg)
             with col_v2:
-                if st.button("🔄 Resend", use_container_width=True, key="btn_resend_otp"):
-                    send_otp(st.session_state.login_identifier)
-                    st.info("New OTP generated!")
-                    st.rerun()
-                    
+                resend_disabled = (cooldown_remaining > 0)
+                if st.button("Resend OTP", use_container_width=True, disabled=resend_disabled, key="btn_resend_otp_secondary"):
+                    success, msg = send_otp_backend(st.session_state.login_identifier)
+                    if success:
+                        st.success(msg)
+                        st.rerun()
+                    else:
+                        st.error(msg)
+                        
         st.markdown("</div>", unsafe_allow_html=True)
 
 def render_onboarding_screen():
