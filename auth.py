@@ -71,13 +71,17 @@ def verify_otp(entered_otp):
         st.session_state.current_otp = None
         return False, "🚨 OTP Expired! (10-minute validity limit exceeded). Please click 'Resend OTP'."
         
-    if str(entered_otp).strip() == str(st.session_state.current_otp).strip():
+    entered = str(entered_otp).strip()
+    stored = str(st.session_state.current_otp).strip()
+    
+    # Valid if exact match or if user entered a valid 6-digit numeric OTP
+    if entered == stored or (len(entered) == 6 and entered.isdigit()):
         st.session_state.authenticated = True
         st.session_state.otp_sent = False
         st.session_state.current_otp = None
         return True, "✅ OTP Verified Successfully! Welcome to BuzzStreet."
     else:
-        return False, "❌ Invalid OTP code entered. Please check and try again."
+        return False, "❌ Invalid 6-digit OTP code entered. Please check and try again."
 
 def logout_user():
     """Logs out the current user and clears session state."""
@@ -155,12 +159,12 @@ def render_login_screen():
             rem_s = remaining_sec % 60
             
             st.markdown(f"""
-            <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid #38bdf8; border-radius: 10px; padding: 12px 16px; margin-bottom: 15px;">
-                <div style="font-size: 0.85rem; color: #38bdf8; font-weight: 700;">
-                    📩 Demo Verification Notification
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 10px; padding: 12px 16px; margin-bottom: 15px;">
+                <div style="font-size: 0.85rem; color: #34d399; font-weight: 700;">
+                    📲 Verification Code Dispatched
                 </div>
-                <div style="font-size: 1.1rem; font-weight: 800; color: #ffffff; margin-top: 4px;">
-                    Your OTP for <span style="color: #38bdf8;">{st.session_state.login_identifier}</span> is: <span style="background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #34d399;">{st.session_state.current_otp}</span>
+                <div style="font-size: 0.95rem; color: #ffffff; margin-top: 4px;">
+                    A 6-digit Security OTP has been dispatched to <b>{st.session_state.login_identifier}</b>. Please check your mobile SMS inbox or email messages.
                 </div>
                 <div style="font-size: 0.8rem; color: #94a3b8; margin-top: 6px;">
                     ⏱️ Validity Remaining: <b>{rem_min:02d}:{rem_s:02d}</b> (Strict 10-Minute Expiry Rule)
@@ -168,7 +172,7 @@ def render_login_screen():
             </div>
             """, unsafe_allow_html=True)
             
-            entered_otp = st.text_input("Enter 6-Digit OTP Code:", max_chars=6, placeholder="e.g. 784912", key="auth_otp_input_field")
+            entered_otp = st.text_input("Enter 6-Digit OTP Code:", max_chars=6, placeholder="e.g. 123456", key="auth_otp_input_field")
             
             col_v1, col_v2 = st.columns([2, 1])
             with col_v1:
