@@ -8,6 +8,7 @@ import random
 import datetime
 
 # Large curated pool of realistic financial headlines divided by sentiment/narrative
+# Large curated pool of realistic financial headlines divided by sentiment/narrative
 NEWS_POOL = {
     "positive": [
         "Tech sector sees unprecedented growth in Q4, driving indices higher.",
@@ -29,7 +30,12 @@ NEWS_POOL = {
         "FDI inflows rise by 15% as foreign investors find domestic markets highly attractive.",
         "Excellent earnings reports from banking sector lift financial index.",
         "Manufacturing PMI climbs to a 3-year high, indicating robust industrial growth.",
-        "Exports touch record highs as global demand for pharmaceutical products surges."
+        "Exports touch record highs as global demand for pharmaceutical products surges.",
+        "Nvidia announces next-gen AI chip architecture, shares jump 12% in pre-market.",
+        "Reliance Industries expands retail footprint with major international partnership.",
+        "Apple reports record iPhone sales in emerging markets, outperforming estimates.",
+        "Tesla EV deliveries surge 25% quarter-over-quarter as production scales.",
+        "Federal Reserve signals potential rate cuts following cooling inflation metrics."
     ],
     "negative": [
         "Inflation hits record high, sparking recession fears and market selloffs.",
@@ -49,7 +55,9 @@ NEWS_POOL = {
         "Credit rating agency downgrades economic outlook from stable to negative.",
         "Fiscal deficit widens as government expenditure outpaces revenue collections.",
         "Industrial output contracts by 1.2% in negative surprise to analysts.",
-        "Corporate bond defaults reach highest level in five years, signaling distress."
+        "Corporate bond defaults reach highest level in five years, signaling distress.",
+        "Semiconductor equipment makers drop following new export control restrictions.",
+        "Automotive manufacturer announces layoff of 10,000 workers amid weakening demand."
     ],
     "panic": [
         "IMMEDIATE LIQUIDITY CRISIS: Major investment bank halts withdrawals.",
@@ -61,7 +69,8 @@ NEWS_POOL = {
         "Massive bank run reported at regional banks, retail investors panic.",
         "Real estate bubble burst imminent as mortgage default rate doubles overnight.",
         "Currency value crashes by 10% in a single session against the dollar.",
-        "Hyperinflation warnings triggered as wholesale prices surge by 40%."
+        "Hyperinflation warnings triggered as wholesale prices surge by 40%.",
+        "Systemic margin calls force multi-billion dollar hedge fund liquidation."
     ],
     "neutral": [
         "Federal Reserve to hold meeting on monetary policy next week.",
@@ -81,7 +90,9 @@ NEWS_POOL = {
         "New tax filing rules come into effect this fiscal year.",
         "Commodities market experiences standard seasonal volatility.",
         "Annual financial audit reports published for major PSUs.",
-        "National statistics office to release GDP figures on Friday."
+        "National statistics office to release GDP figures on Friday.",
+        "Interbank borrowing rates remain stable ahead of policy decision.",
+        "Commercial real estate vacancy rates hold steady across key metropolitan hubs."
     ]
 }
 
@@ -94,10 +105,8 @@ if os.path.exists(csv_path):
         df = pd.read_csv(csv_path)
         if 'Sentence' in df.columns and 'Sentiment' in df.columns:
             df = df.dropna(subset=['Sentence', 'Sentiment'])
-            # Create set for each category to perform O(1) deduplication check
             pool_sets = {k: set(v) for k, v in NEWS_POOL.items()}
             
-            # Convert dataframe to dictionary records to avoid slow iterrows()
             records = df[['Sentence', 'Sentiment']].to_dict('records')
             for row in records:
                 sent = str(row['Sentiment']).strip().lower()
@@ -108,6 +117,7 @@ if os.path.exists(csv_path):
                         NEWS_POOL[sent].append(text)
     except Exception as e:
         print(f"Warning: Failed to load news pool CSV {csv_path}: {e}")
+
 
 
 def generate_headlines(bias="neutral", count=20):

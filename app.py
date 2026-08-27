@@ -1054,7 +1054,87 @@ with tab_narrative:
         
     st.divider()
 
+    # B. AI Market Headline Shock Simulator (What-If Scenario Sandbox)
+    st.markdown("#### 🧪 AI Market Headline Shock Simulator (What-If Sandbox)")
+    st.markdown("Simulate how sudden news shocks or custom headlines impact the **Composite Sentiment Index**, **Narrative Phase**, and **1-Day Index Price Target** in real time.")
     
+    col_sim1, col_sim2 = st.columns([2, 3])
+    with col_sim1:
+        preset_scenario = st.selectbox(
+            "Select Scenario Preset:",
+            options=[
+                "Custom Headline Input 💬",
+                "🚀 Fed Interest Rate Cut (-50 bps)",
+                "🚨 Global Oil Supply Crisis & Inflation Spike",
+                "📈 Tech Mega-Cap Profit Boom (+40% YoY)",
+                "⚠️ Geopolitical Trade Tariff Escalation"
+            ],
+            key="shock_preset_choice"
+        )
+        
+        preset_text_map = {
+            "🚀 Fed Interest Rate Cut (-50 bps)": "Federal Reserve cuts benchmark interest rates by 50 bps as inflation cools down rapidly, sparking massive equity market rally.",
+            "🚨 Global Oil Supply Crisis & Inflation Spike": "Global oil pipeline shutdown triggers severe energy crisis, sending crude oil above $120 a barrel and sparking hyperinflation fears.",
+            "📈 Tech Mega-Cap Profit Boom (+40% YoY)": "Top artificial intelligence and cloud tech giants report 40% YoY profit growth, beating all Wall Street revenue forecasts.",
+            "⚠️ Geopolitical Trade Tariff Escalation": "New 25% trade tariffs imposed on imported goods, sparking severe retaliatory measures and dragging international indices lower."
+        }
+        
+        if preset_scenario != "Custom Headline Input 💬":
+            sim_headline = preset_text_map[preset_scenario]
+            st.info(f"**Selected Preset:** {sim_headline}")
+        else:
+            sim_headline = st.text_input(
+                "Enter Custom News Headline:",
+                value="Nvidia announces breakthrough quantum AI architecture, sending global semiconductor stocks soaring 15%.",
+                key="shock_custom_input"
+            )
+            
+    with col_sim2:
+        if sim_headline:
+            # Perform instant dual-model inference
+            v_res = narrative_detector.analyze_vader_sentiment(sim_headline)
+            lr_res = narrative_detector.predict_lr_sentiment(sim_headline, vectorizer, lr_model)
+            
+            v_score = v_res["Compound Score"]
+            lr_score = lr_res["Positive Prob"] - lr_res["Negative Prob"]
+            
+            # Blend score using current sidebar weight
+            w = st.session_state.vader_weight
+            sim_composite = round((w * v_score) + ((1.0 - w) * lr_score), 4)
+            
+            # Phase determination
+            if sim_composite >= 0.25:
+                sim_phase = "🚀 Optimistic"
+                sim_color = "#10b981"
+            elif sim_composite >= -0.10:
+                sim_phase = "⚖️ Neutral"
+                sim_color = "#3b82f6"
+            elif sim_composite >= -0.55:
+                sim_phase = "⚠️ Fear"
+                sim_color = "#f59e0b"
+            else:
+                sim_phase = "🚨 Panic"
+                sim_color = "#ef4444"
+                
+            # Compute simulated price tick impact (+- 1.5% max)
+            sim_nifty_change = round(sim_composite * 1.25, 2)
+            
+            st.markdown(f"""
+            <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid {sim_color}; padding: 16px 20px; border-radius: 10px;">
+                <div style="font-size: 0.8rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Headline Impact Simulation Result</div>
+                <div style="font-size: 1.4rem; font-weight: 800; color: {sim_color}; margin-top: 4px;">
+                    Phase: {sim_phase} | Composite Score: {sim_composite:+.4f}
+                </div>
+                <div style="display: flex; gap: 15px; margin-top: 10px; font-size: 0.85rem; color: #cbd5e1;">
+                    <div><b>VADER Score:</b> {v_score:+.4f} ({v_res['Sentiment Label']})</div>
+                    <div><b>LogReg ML:</b> {lr_score:+.4f} ({lr_res['Sentiment Label']})</div>
+                    <div><b>Est. 1D Price Impact:</b> <span style="color: {sim_color}; font-weight: bold;">{sim_nifty_change:+.2f}%</span></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+    st.divider()
+
     # C. Dynamic Live Headlines Stream Table
     st.markdown("#### 🚨 Captured Financial News Streams")
     st.markdown("Dynamic stream of financial headlines ingested into the engine. Toggle between the **Active 20-Headline Stream** and the **Full 300,000+ Kaggle Corpus** directly in this column.")
@@ -1126,7 +1206,19 @@ with tab_narrative:
         if search_query:
             df_filtered = df_filtered[df_filtered["Headline Text"].str.contains(search_query, case=False, na=False)]
             
-        st.markdown(f"Showing **{len(df_filtered):,}** matching headlines out of **{len(df_all):,}** total ingested Kaggle records.")
+        c_count, c_dl = st.columns([3, 1])
+        with c_count:
+            st.markdown(f"Showing **{len(df_filtered):,}** matching headlines out of **{len(df_all):,}** total ingested Kaggle records.")
+        with c_dl:
+            csv_data = df_filtered.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download CSV",
+                data=csv_data,
+                file_name="buzzstreet_kaggle_filtered.csv",
+                mime="text/csv",
+                use_container_width=True,
+                key="dl_kaggle_csv"
+            )
         
         # Pagination logic
         page_size = 100

@@ -1,0 +1,224 @@
+[1] BuzzStreet- A Narrative Shift Detection Engine (Market Psychology AI)
+
+[2] Parvathisha Pudugosula
+
+[3] Department of Computer Science and Engineering
+
+[4] Dayananda Sagar Academy of Technology and Management Bengaluru, India
+
+[5] Parvathisha-cse@dsatm.edu.in
+
+[6] Suhani S Bagane
+
+[7] Department of Computer Science and Engineering
+
+[8] Dayananda Sagar Academy of Technology and Management Bengaluru, India 1dt23cs221@dsatm.edu.in
+
+[9] Sanvi S K
+
+[10] Department of Computer Science and Engineering
+
+[11] Dayananda Sagar Academy of Technology and Management Bengaluru, India 1dt23cs197@dsatm.edu.in
+
+[12] Shagun Arya
+
+[13] Department of Computer Science and Engineering
+
+[14] Dayananda Sagar Academy of Technology and Management Bengaluru, India
+
+[15] 1dt23cs198@dsatm.edu.in
+
+[16] -13506464533900Abstract— Financial markets are influenced not only by economic indicators but also by public sentiment and evolving narratives in news and social media. This paper proposes BuzzStreet, a Narrative Shift Detection Engine — an AI-based system that analyzes financial headlines to identify changes in market sentiment over time. The system employs NLP techniques including tokenization, stopword removal, WordNet lemmatization, and TF-IDF(Term Frequency-Inverse Document Frequency) vectorization for feature extraction, and performs sentiment analysis using VADER(Valence Aware Dictionary and Sentiment Reasoner) and a Logistic Regression classifier to categorize financial text as Positive, Negative, or Neutral. A composite sentiment index, computed as a weighted blend of VADER lexicon scores and Logistic Regression probabilities, is tracked chronologically to detect narrative phase transitions across four states: Optimistic, Neutral,Fear and Panic, trends are correlated with simulated Nifty 50 and Sensex index movements through time-series analysis, and results are visualized through an interactive Streamlit dashboard featuring dual-axis trend graphs, phase transition timelines, a live Trading View market feed, and an anomaly detection ticker. The system also integrates a context-aware AI chatbot for real-time querying of sentiment drivers and narrative shifts. This work demonstrates how AI-driven NLP analysis of financial text can serve as an early indicator of market volatility, bridging computational linguistics with financial market intelligence.
+
+[17] Keywords— Sentiment Analysis, Narrative Shift Detection, VADER, Logistic Regression, TF-IDF, NLP, Financial Markets.
+
+[18] INTRODUCTION
+
+[19] Financial markets operate in a highly dynamic environment where decisions are influenced not only by economic indicators and company performance but also by public perception and investor sentiment. With the rapid growth of digital media, financial news articles, online discussions, and social media platforms have become major sources shaping market narratives. These narratives can significantly influence investor behavior, often triggering rapid market movements driven by optimism, uncertainty, or fear [1], [3],[17],[20].
+
+[20] Traditional financial analysis methods primarily focus on historical price trends and technical indicators, which may not fully capture the psychological and informational factors affecting market dynamics. Manual interpretation of large volumes of textual information from multiple sources makes it difficult to identify overall sentiment and evolving narratives efficiently. As the volume of online financial content continues to grow, this manual approach becomes increasingly impractical and time-consuming [12], [13].
+
+[21] Recent advancements in Artificial Intelligence (AI) and Natural Language Processing (NLP) provide new opportunities to analyze large volumes of textual data and extract meaningful insights from financial narratives. Techniques such as TF-IDF vectorization, VADER sentiment analysis, and supervised classifiers like Logistic Regression have demonstrated strong capability in classifying and tracking sentiment from financial text [4], [5],[15]. By examining how sentiment evolves over time, it becomes possible to detect patterns in market perception before they are reflected in price movements [6],[7],[10]. Therefore, this paper introduces BuzzStreet, a Narrative Shift Detection Engine that analyzes financial headlines to detect sentiment trends and identify discrete narrative phase transitions. The system integrates a composite sentiment index, time-series market correlation, an interactive Streamlit dashboard, and a context-aware AI chatbot, bridging the gap between computational linguistics and real-world financial market intelligence.
+
+[22] LITERATURE SURVEY
+
+[23] The literature on financial sentiment analysis demonstrates significant progress in applying Natural Language Processing and machine learning to extract insights from textual financial data. Numerous studies have leveraged NLP techniques and deep learning architectures to classify sentiment, track narrative trends, and support market decision-making [1], [2], [3], [4].
+
+[24] Large Language Models for Financial Sentiment
+
+[25] Recent work has extensively explored the application of Large Language Models for financial sentiment classification. Liu et al[3] investigated the use of LLMs to analyze sentiment from financial news articles and textual data, demonstrating strong classification performance across multiple financial domains and asset classes. While the study achieved competitive accuracy in sentiment labeling, it primarily focused on static classification tasks and did not examine how narratives evolve over time or how sentiment shifts directly correlate with actual market price behavior, significantly limiting its applicability for dynamic, real-time narrative tracking systems.
+
+[26] Time-Series Sentiment Analysis Using RNNs
+
+[27] Temporal modeling of financial sentiment has gained considerable research attention in recent years. Shashank et al. [2] applied Recurrent Neural Networks to analyze financial headlines and track sentiment changes across time, effectively leveraging the sequential nature of RNNs to capture temporal dependencies present in financial text streams[6],[7],[8] However, the study relied exclusively on headline-level data and did not integrate complementary sources such as social media discussions or financial market price data, considerably restricting the depth and breadth of narrative analysis achievable through this single-source approach.
+
+[28] Deep Learning-Based Financial Sentiment Analysis
+
+[29] Deep learning models have been widely adopted for financial sentiment analysis due to their ability to capture contextual and sequential information from textual data. Chen [8] proposed a WMSA-Bi-LSTM model for financial news sentiment classification, while Bacco et al. [6] and Peivandizadeh et al. [7] demonstrated the effectiveness of LSTM-based architectures in integrating sentiment information for stock market prediction. These approaches achieved strong predictive performance; however, they often require significant computational resources and may lack interpretability compared to traditional machine learning approaches.
+
+[30] Sentiment Change and Narrative Evolution Analysis
+
+[31] Understanding how sentiment evolves over time has become an important research area in financial and social media analytics. Alattar and Shaalan [16] investigated factors responsible for sentiment changes in online platforms, while Li et al. [19] proposed a dual-attention sentiment prediction framework incorporating temporal information. Jiang et al. [20] further demonstrated the importance of sentiment computing for analyzing news events using large-scale social media data. Although these studies successfully modeled sentiment evolution, they did not focus on discrete narrative phase detection for financial markets..
+
+[32] Identified Research Gaps
+
+[33] While prior studies achieved meaningful results in financial sentiment classification, temporal modeling, and entity-level analysis, most approaches remain constrained to a single data source or a single analytical dimension. Few systems combine multi-model sentiment analysis, real-time narrative phase tracking, market index correlation, and anomaly detection within a unified and deployable interactive interface [3], [6], [7],[8],[16],[20]. Additionally, the integration of lexicon-based and supervised classification methods into a composite sentiment framework remains largely unexplored in existing literature.
+
+[34] To address these gaps, this paper introduces BuzzStreet, a Narrative Shift Detection Engine that unifies VADER lexicon analysis, Logistic Regression classification, composite sentiment indexing, and four-state narrative phase detection into an interactive Streamlit dashboard, transforming financial NLP research from static sentiment classification toward dynamic, real-time market narrative intelligence [1], [2], [3], [4].
+
+[35] PROPOSED SYSTEM ARCHITECTURE
+
+[36] The proposed BuzzStreet framework is designed as an end-to-end intelligent financial narrative analysis system that automates the process of data ingestion, NLP preprocessing, sentiment classification, narrative phase detection, and interactive visualization. The architecture consists of several interconnected modules responsible for data acquisition, text processing, model inference, market correlation, and dashboard deployment
+
+[37] Data Ingestion and Input Handling
+
+[38] The system begins by collecting financial headlines as its primary input. Headlines are generated and fetched dynamically through the data_loader module, which supports four configurable market bias parameters — Neutral, Bullish, Bearish, and Panic — allowing the system to simulate realistic financial news streams across varying market conditions. Simultaneously, the simulate_market_indices() function fetches corresponding Nifty 50 and Sensex index values, enabling direct correlation between textual sentiment and market price movements. This integration facilitates practical usability by combining textual and numerical financial data within a single unified pipeline [1], [6],[10].
+
+[39] NLP Preprocessing Pipeline
+
+[40] Raw financial headlines undergo a structured multi-stage preprocessing pipeline implemented within the nlp_pipeline module via the preprocess_headline_detailed() function. In the first stage, text is lowercased and stripped of noise including punctuation and special characters irrelevant to sentiment. Tokenization is then applied using the NLTK tokenizer, followed by stopword removal using the standard English corpus to eliminate semantically insignificant terms. Subsequently, Part-of-Speech tagging is performed and WordNet lemmatization is applied to reduce tokens to their root conceptual forms, producing a normalized concept vector as the final cleaned output [9],[12],[13].
+
+[41] Each preprocessing step is individually traceable through the NLP Pipeline Inspector tab of the dashboard, allowing full transparency of the cleaning process. This step-by-step visibility ensures interpretability of the pipeline, which is critical for validating the quality of features fed into downstream sentiment models.
+
+[42] Feature Extraction Using TF-IDF
+
+[43] Following preprocessing, the cleaned text is transformed into numerical feature vectors using Term Frequency-Inverse Document Frequency vectorization, implemented through the ml_model module. The get_top_tfidf_features() function computes TF-IDF weights for each token relative to the training corpus vocabulary, quantifying the semantic uniqueness and discriminative importance of each term within the financial domain. The vocabulary size of the trained vectorizer is dynamically reported on the dashboard sidebar, reflecting the breadth of the learned financial lexicon. TF-IDF weights are visualized as a horizontal bar chart within the NLP tab, providing an interpretable view of the most influential terms driving sentiment classification for each headline [5], [15].
+
+[44] Dual-Model Sentiment Classification
+
+[45] At the core of the proposed system lies a dual-model sentiment classification architecture that combines lexicon-based and supervised machine learning approaches. The VADER Sentiment Intensity Analyzer computes four scores per headline — Positive, Negative, Neutral, and Compound — and assigns a sentiment label based on compound score thresholds. Concurrently, the predict_sentiment_lr() function of the ml_model module applies a trained Scikit-learn Logistic Regression classifier to produce class probability scores for Positive, Negative, and Neutral sentiment categories. A composite sentiment index is then calculated by the narrative_detector module using a configurable weighted blend of VADER compound scores and Logistic Regression probabilities, controlled through the VADER Lexicon Weight slider on the dashboard sidebar. This dual-model design enables robust sentiment quantification by combining the interpretability of lexicon rules with the discriminative power of supervised learning [4], [5], [15].
+
+[46] Implementation Modules
+
+[47] To ensure maintainability and scalability, the proposed framework is implemented in a modular Python environment with each component developed as an independent script.
+
+[48] data_loader.py: Handles financial headline generation across four bias parameters and simulates Nifty 50 and Sensex index movements based on the computed composite sentiment index.
+
+[49] nlp_pipeline.py: Implements the full multi-stage NLP preprocessing pipeline including lowercasing, noise removal, tokenization, stopword filtering, POS tagging,  and WordNet lemmatization.
+
+[50] ml_model.py: Encapsulates the trained TF-IDF vectorizer and Logistic Regression classifier, exposes sentiment prediction, TF-IDF feature retrieval, accuracy metrics, and confusion matrix data.
+
+[51] narrative_detector.py: Computes the composite sentiment index, detects the current narrative phase, generates the chronological transition chain, and provides phase-specific styling for the dashboard.
+
+[52] chatbot.py: Generates context-aware AI responses based on live sentiment index, narrative phase, transition history, and active headline data.
+
+[53] This modular design simplifies debugging, future upgrades, and scalability. Each module can be independently modified without disrupting the overall pipeline .
+
+[54] Dashboard and Visualization
+
+[55] The trained models are deployed through an interactive Streamlit web dashboard organized across four tabs: Narrative Intelligence, NLP Cleaning and TF-IDF, ML Training Cockpit, and AI Narrative Chatbot. The Narrative Intelligence tab displays live KPI metrics including Nifty 50 and Sensex values, current narrative phase, and an anomaly risk score computed from model discrepancy rates. A dual-axis Plotly chart visualizes the composite sentiment index alongside Nifty 50 price trends over time, while a step-plot timeline illustrates discrete narrative phase transitions. A live TradingView market feed is embedded for real-time global asset tracking, and an anomaly detection marquee flags suspicious financial narratives [4], [16].
+
+[56] G. Novelty and System  Relevance
+
+[57] The proposed BuzzStreet framework extends conventional financial sentiment analysis by integrating TF-IDF feature extraction, VADER sentiment scoring, and Logistic Regression classification within a unified architecture [4], [5], [15]. Unlike existing studies that primarily focus on sentiment classification or stock prediction [3], [6], [7], [8], BuzzStreet emphasizes narrative evolution through a four-state detection model consisting of Optimistic, Neutral, Fear, and Panic phases. The system further incorporates a composite sentiment index, anomaly detection, market correlation analysis, and an interactive AI assistant. These capabilities enable real-time monitoring, interpretation, and visualization of financial narrative shifts, improving explainability and decision support [16], [19], [20].
+
+[58] Fig 1: System Architecture Flowchart
+
+[59] Fig 2: Model Training History (Accuracy and Loss Trends for Logistic Regression)
+
+[60] EXPERIMENTAL SETUP
+
+[61] To validate the proposed BuzzStreet framework, a comprehensive experimental setup was designed focusing on data preparation, model training configuration, and performance evaluation. The experiments were conducted using Python 3.10, Scikit-learn, NLTK, and Streamlit on a system equipped with 8 GB RAM and a standard CPU environment, reflecting a lightweight and accessible deployment configuration.
+
+[62] Dataset and Preparation
+
+[63] 12624710The dataset used for experimentation consists of financial headlines categorized into three sentiment classes: Positive, Negative, and Neutral. Headlines were sourced from publicly available financial news datasets to ensure accessibility and reproducibility [1], [17]. The dataset was split into an 80:20 train-test ratio to ensure balanced representation across sentiment categories. To enhance the diversity of training samples, headlines were generated across four configurable market bias parameters — Neutral, Bullish, Bearish, and Panic — simulating realistic variations in financial language and tone. This approach improved the generalization capability of the trained Logistic Regression classifier across a broad range of financial narrative styles [6], [7],[8].
+
+[64] Model Training Configuration
+
+[65] The sentiment classification model was trained using a Logistic Regression classifier from the Scikit-learn library, applied to          TF-IDF feature vectors extracted from preprocessed financial          headlines. The TF-IDF vectorizer was fitted on the training corpus, producing a fixed-size vocabulary that quantifies the semantic uniqueness of each term relative to the broader dataset[5],[15].The classifier was trained to predict three       sentiment classes — Positive, Negative, and Neutral — and   exposes per-class probability scores used in computing the composite sentiment   index. Concurrently, the VADER Sentiment Intensity Analyzer was configured as a  complementary lexicon-based model operating independently of training data, computing Positive, Negative, Neutral, and Compound scores for each headline in real time[4].
+
+[66] Fig 3: Narrative Shift Phase Timeline
+
+[67] A configurable VADER Lexicon Weight parameter, adjustable via the dashboard sidebar slider, governs the weighted blending of VADER compound scores and Logistic Regression probabilities to produce the final composite sentiment index. This dual-model configuration ensures robust sentiment quantification while maintaining real-time inference speed suitable for interactive dashboard deployment [4], [5], [15].
+
+[68] Performance Metrics
+
+[69] The performance of the proposed system was evaluated using classification accuracy, precision, recall, and F1-score. Accuracy measures the overall proportion of correctly classified instances, while precision evaluates the correctness of positive predictions. Recall measures the system's ability to identify relevant instances, and the F1-score provides a balanced assessment by combining precision and recall. These metrics were selected to comprehensively evaluate the effectiveness of the sentiment classification module and overall narrative detection performance.
+
+[70] Fig 4: Training vs. Validation Accuracy over 30 Epochs
+
+[71] The classification report demonstrates the effectiveness of the Logistic Regression sentiment classifier across the Positive, Negative, and Neutral categories. Precision, recall, and F1-score values provide a detailed assessment of prediction quality and class-level performance. Consistent performance across sentiment categories indicates that the model is capable of handling diverse financial narratives without significant class bias. These results validate the suitability of the classifier for real-time sentiment analysis and narrative shift detection within the proposed BuzzStreet framework.
+
+[72] 9144002432050
+
+[73] Fig 5: Model Confusion Matrix
+
+[74] This figure presents the confusion matrix of the Logistic Regression sentiment classifier. The diagonal elements represent correctly classified Positive, Negative, and Neutral sentiment instances, while off-diagonal values indicate misclassifications. A strong concentration of values along the diagonal demonstrates the model's ability to accurately distinguish between different sentiment categories. The confusion matrix provides additional insight into classification behaviour and supports the effectiveness of the proposed sentiment analysis framework.
+
+[75] RESULTS AND DISCUSSION
+
+[76] The proposed BuzzStreet system successfully demonstrated end-to-end financial narrative analysis across all four market bias configurations. The following sections present quantitative classification performance, dashboard output analysis, and a discussion on system robustness.
+
+[77] Quantitative Analysis
+
+[78] The trained Logistic Regression classifier, evaluated on the held-out 20% test split, achieved strong performance across all three sentiment categories. Per-class precision, recall, and F1-scores for Positive, Negative, and Neutral sentiment classes are reported in the classification report displayed within the ML Training Cockpit tab. The model's overall accuracy is prominently reported as a key performance indicator on the dashboard, confirming balanced learning across sentiment categories without significant class bias. The confusion matrix heatmap (Fig. 5) illustrates strong diagonal dominance, indicating that the majority of headlines were correctly classified into their respective sentiment categories [5],[15].
+
+[79] Minor misclassifications were observed at the boundary between Positive and Neutral categories, which is expected given the contextual ambiguity of moderately toned financial language. To contextualize performance, the dual-model comparison table within the ML Training Cockpit presents side-by-side VADER and Logistic Regression probability scores across all active headlines, enabling direct benchmarking of lexicon-based versus supervised classification approaches. Results confirm that the composite sentiment index — blending both models — consistently produces a more stable and representative sentiment signal than either model in isolation [4], [5],[15].
+
+[80] Dashboard Output and Narrative Detection
+
+[81] Beyond classification metrics, the system demonstrated reliable narrative phase detection across simulated market scenarios. The Narrative Intelligence tab successfully tracked composite sentiment index fluctuations over time and detected discrete phase transitions across the four states — Optimistic, Neutral, Fear, and Panic — rendering each transition on a step-plot timeline with phase-specific color coding. The anomaly risk score, computed from VADER and Logistic Regression model discrepancy rates, flagged suspicious narrative shifts with high responsiveness. The embedded TradingView feed and dual-axis Plotly chart further corroborated detected sentiment trends against live Nifty 50 and Sensex price movements, demonstrating meaningful correlation between textual sentiment and market behavior [10], [14], [16] .
+
+[82] Discussion on Model Robustness
+
+[83] The robustness of BuzzStreet was validated through its consistent performance across all four configurable market bias parameters — Neutral, Bullish, Bearish, and Panic — each representing a distinct financial narrative environment. The modular pipeline architecture ensured that individual components including the NLP preprocessor, TF-IDF vectorizer, Logistic Regression classifier, and narrative detector could be independently evaluated and validated without disrupting overall system behavior. The configurable VADER Lexicon Weight slider further allowed real-time recalibration of the sentiment blend, confirming system adaptability without model retraining. The integration of the AI chatbot provided an additional interpretability layer by generating narrative summaries consistent with the detected sentiment states across all tested scenarios. [4],[5], [15].
+
+[84] APPLICATIONS
+
+[85] The proposed system has multiple real-world applications in financial and analytics contexts:
+
+[86] Financial Decision Support: Assists investors and analysts in interpreting large volumes of information from multiple sources to identify overall market sentiment and evolving narratives trends. By providing sentiment-based insights and narrative phase detection, the system supports more informed investment and risk-management decisions.
+
+[87] -13657984556238       Market Analysis Automation: Reduces the effort and time required for manual market analysis by automatically processing financial news and textual data using Natural Language Processing and Machine Learning techniques.
+
+[88] Volatility Indication: Correlates sentiment patterns with stock market price data to serve as a potential early indicator of market volatility and price movements.
+
+[89] Misinformation and Anomaly Detection: Helps identify unusual sentiment patterns, suspicious financial narratives, and potential misinformation campaigns that may influence market behavior and investor perception.
+
+[90] CONCLUSION AND FUTURE WORK
+
+[91] This paper presented BuzzStreet, an end-to-end framework for financial narrative shift detection and market sentiment analysis using Natural Language Processing and Machine Learning techniques. The proposed system integrates advanced text preprocessing, TF-IDF feature extraction, VADER sentiment scoring, and Logistic Regression classification within a unified interactive dashboard. Experimental results demonstrated reliable classification of Positive, Negative, and Neutral financial sentiments, while the narrative detection module successfully tracked transitions across Optimistic, Neutral, Fear, and Panic market states. The inclusion of visualization tools, anomaly monitoring, and an AI-assisted interface enhanced interpretability and user interaction. Overall, the proposed framework demonstrates the potential of combining sentiment analysis and narrative intelligence for real-time financial monitoring and decision-support applications.
+
+[92] REFERENCES
+
+[93] S. T. Surulivel, V. Dhivya, A. Nandhini Priya, and S. Selvabaskar, “A Sentiment Analysis of Financial News for Stock Price Prediction,” in Proc. 2026 12th International Conference on Advanced Computing and Communication Systems (ICACCS), IEEE, 2026.
+
+[94] “Stock Market Trend Prediction Model Using Deep Learning Based Sentiment Analysis of Financial Data," in Proc. IEEE Conf., 2025.
+
+[95] C. Liu, A. Arulappan, R. Naha, A. Mahanti, J. Kamruzzaman, and I.-H. Ra, "Large Language Models and Sentiment Analysis in Financial Markets: A Review, Datasets, and Case Study," IEEE Access, 2024.
+
+[96] M. Siek and E. S. Setiadi, "Analysis of News Sentiment and Stock Price Using Web Scraping and VADER Sentiment Analysis," in Proc. Int. Conf. Information Management and Technology (ICIMTech), Bali, Indonesia, Aug. 2024, doi: 10.1109/ICIMTech62638.2024.10780837.
+
+[97] K. Alemerien, A. Al-Ghareeb and M. Z. Alksasbeh, "Sentiment Analysis of Online Reviews: A Machine Learning Based Approach with TF-IDF Vectorization," in Journal of Mobile Multimedia, vol. 20, no. 5, pp. 1089-1116, September 2024, doi: 10.13052/jmm1550-4646.2055.
+
+[98] L. Bacco, L. Petrosino, D. Arganese, L. Vollero, M. Papi and M. Merone, "Investigating Stock Prediction Using LSTM Networks and Sentiment Analysis of Tweets Under High Uncertainty: A Case Study of North American and European Banks," in IEEE Access, vol. 12, pp. 122239-122248, 2024, doi: 10.1109/ACCESS.2024.3450311.
+
+[99] A. Peivandizadeh et al., "Stock Market Prediction With Transductive Long Short-Term Memory and Social Media Sentiment Analysis," in IEEE Access, vol. 12, pp. 87110-87130, 2024, doi: 10.1109/ACCESS.2024.3399548.
+
+[100] Y. Chen, "Financial News Sentiment Analysis Method Based on WMSA-Bi-LSTM," in Proc. 4th Int. Conf.,IntelligentDesign(ICID),2023,doi:10.1109/ICID60307.2023.10396691.
+
+[101] R. Patil, S. Boit, V. Gudivada and J. Nandigam, "A Survey of Text Representation and Embedding Techniques in NLP," in IEEE Access, vol. 11, pp. 36120-36146, 2023, doi: 10.1109/ACCESS.2023.3266377
+
+[102] G. Mu, N. Gao, Y. Wang and L. Dai, "A Stock Price Prediction Model Based on Investor Sentiment and Optimized Deep Learning," in IEEE Access, vol. 11, pp. 51353-51367, 2023, doi: 10.1109/ACCESS.2023.3278790.
+
+[103] W. Oueslati, S. Mejri, S. Al-Otaibi and S. Ayouni, "Recognition of Opinion Leaders in Social Networks Using Text Posts’ Trajectory Scoring and Users’ Comments Sentiment Analysis," in IEEE Access, vol. 11, pp. 123589-123609, 2023, doi: 10.1109/ACCESS.2023.3329049.
+
+[104] T. Fontes, F. Murços, E. Carneiro, J. Ribeiro and R. J. F. Rossetti, "Leveraging Social Media as a Source of Mobility Intelligence: An NLP-Based Approach," in IEEE Open Journal of Intelligent Transportation Systems, vol. 4, pp. 663-681, 2023, doi: 10.1109/OJITS.2023.3308210.
+
+[105] N. Raghunathan and K. Saravanakumar, "Challenges and Issues in Sentiment Analysis: A Comprehensive Survey," in IEEE Access, vol. 11, pp. 69626-69642, 2023, doi: 10.1109/ACCESS.2023.3293041.
+
+[106] G. J. Sawale and M. K. Rawat, "Stock Market Prediction using Sentiment Analysis and Machine Learning Approach," in Proc. 4th Int. Conf. Smart Systems and Inventive Technology(ICSSIT),2022,pp.1–6
+
+[107] H. Liu, X. Chen, and X. Liu, “A Study of the Application of Weight Distributing Method Combining Sentiment Dictionary and TF-IDF for Text Sentiment Analysis,” IEEE Access, vol. 10, pp. 112102–112113, 2022, doi: 10.1109/ACCESS.2022.3214622.
+
+[108] F. Alattar and K. Shaalan, "Using Artificial Intelligence to Understand What Causes Sentiment Changes on Social Media," in IEEE Access, vol. 9, pp. 61756-61767, 2021, doi: 10.1109/ACCESS.2021.3073657.
+
+[109] A. Agarwal, "Sentiment Analysis of Financial News," in Proc. 12th Int. Conf. Computational Intelligence and Communication Networks (CICN), 2020, pp. 312–315, doi: 10.1109/CICN49253.2020.9242631.
+
+[110] M. Zhou, J. Yi, J. Yang and Y. Sima, "Characteristic Representation of Stock Time Series Based on Trend Feature Points," in IEEE Access, vol. 8, pp. 97016-97031, 2020, doi: 10.1109/ACCESS.2020.2995958.
+
+[111] L. Li, Y. Wu, Y. Zhang and T. Zhao, "Time+User Dual Attention Based Sentiment Prediction for Multiple Social Network Texts With Time Series," in IEEE Access, vol. 7, pp. 17644-17653, 2019, doi: 10.1109/ACCESS.2019.2895897.
+
+[112] D. Jiang, X. Luo, J. Xuan and Z. Xu, "Sentiment Computing for the News Event Based on the Social Media Big Data," in IEEE Access, vol. 5, pp. 2373-2382, 2017, doi: 10.1109/ACCESS.2016.2607218.
+
