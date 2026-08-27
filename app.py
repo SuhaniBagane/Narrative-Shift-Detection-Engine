@@ -32,6 +32,17 @@ import narrative_detector
 import chatbot
 import auth
 
+# Production Engine Modules
+import db
+import news_service
+import explainable_ai
+import correlation_engine
+import backtester
+import paper_trading
+import report_generator
+import model_registry
+import system_health
+
 # Initialize VADER Sentiment Intensity Analyzer
 try:
     sia = SentimentIntensityAnalyzer()
@@ -566,17 +577,21 @@ st.markdown('<span class="milestone-badge">Phase II Milestone (50% Completion Re
 # ----------------------------------------------------
 # TABULAR LAYOUT FOR COCKPIT SECTIONS
 # ----------------------------------------------------
-tab_narrative, tab_nlp, tab_ml, tab_chatbot, tab_predict, tab_compare, tab_advisor = st.tabs([
-    "📈 Narrative Intelligence", 
-    "🧠 NLP Cleaning & TF-IDF", 
-    "🤖 ML Training Cockpit", 
-    "💬 AI Narrative Chatbot",
-    "🔮 Stock & Trade Predictor",
-    "📊 Multi-Asset Comparison",
-    "🎯 Personal AI Investment Advisor"
+tab_live, tab_nlp, tab_ml, tab_intel, tab_forecast, tab_corr, tab_portfolio, tab_assistant, tab_dataset, tab_profile, tab_admin = st.tabs([
+    "📈 Live Market & Narrative Desk", 
+    "🧠 NLP & Sentiment Lab", 
+    "🤖 ML Model Lab & Registry", 
+    "🚨 Narrative Shift Intelligence",
+    "🔮 Forecasting & Backtesting",
+    "📊 Market Correlation Engine",
+    "💼 Portfolio Simulator & Watchlist",
+    "💬 AI Assistant & Voice Bot",
+    "📂 Dataset Explorer & Provenance",
+    "👤 Profile & Intelligence Report",
+    "🛡️ Admin & System Health"
 ])
 
-with tab_narrative:
+with tab_live:
     # A. Top KPI Row: Stock indices + Narrative state + Anomaly Rating
     st.markdown("### 📊 Market Atmosphere & Indexes")
     
@@ -2060,8 +2075,16 @@ marquee_html = f"""
 """
 st.markdown(marquee_html, unsafe_allow_html=True)
 
+st.markdown("""
+<div style="background: rgba(30, 41, 59, 0.6); border: 1px solid rgba(148, 163, 184, 0.2); border-radius: 8px; padding: 14px 18px; margin-top: 25px; margin-bottom: 15px;">
+    <div style="font-size: 0.8rem; color: #94a3b8; line-height: 1.5; text-align: center;">
+        ⚖️ <b>Academic & Investment Disclaimer:</b> BuzzStreet provides analytical and educational decision-support information based on historical data, financial news streams, and model outputs. Predictions are probabilistic and are not guaranteed. BuzzStreet does not provide personalized financial advice or execute real-money trades.
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: #475569; font-size: 0.85rem;'>BuzzStreet Engine running optimally. Developed for 50% Project Milestone Review (AI & NLP).</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #475569; font-size: 0.85rem;'>BuzzStreet Engine running optimally. Production-Grade Final Year Project Release (AI & NLP).</p>", unsafe_allow_html=True)
 
 # ==========================================
 # 6. FLOATING CHAT WIDGET (BUZZER)
