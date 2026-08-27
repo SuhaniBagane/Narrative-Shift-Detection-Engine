@@ -30,6 +30,7 @@ from nlp_pipeline import preprocess_headline_detailed
 from ml_model import model_instance
 import narrative_detector
 import chatbot
+import auth
 
 # Initialize VADER Sentiment Intensity Analyzer
 try:
@@ -40,9 +41,22 @@ except LookupError:
     sia = SentimentIntensityAnalyzer()
 
 # ==========================================
-# 1. PAGE SETUP & PREMIUM CUSTOM CSS
+# 1. PAGE SETUP & AUTHENTICATION GATE
 # ==========================================
 st.set_page_config(page_title="BuzzStreet - Narrative Shift Detection Engine", layout="wide", initial_sidebar_state="expanded")
+
+# Initialize Auth State
+auth.init_auth_state()
+
+# Enforce Authentication Gate
+if not st.session_state.authenticated:
+    auth.render_login_screen()
+    st.stop()
+
+# Enforce First-Time User Profile Onboarding Gate
+if not st.session_state.onboarding_complete or not st.session_state.user_profile:
+    auth.render_onboarding_screen()
+    st.stop()
 
 # Inject a highly refined CSS theme (curated dark slate colors, glowing accents, and card styling)
 st.markdown("""
@@ -418,10 +432,21 @@ transition_path = narrative_detector.generate_transition_chain(st.session_state.
 # ==========================================
 with st.sidebar:
     st.markdown("### BuzzStreet Console")
-    # Avatar
-    st.markdown('<img src="https://api.dicebear.com/7.x/bottts/svg?seed=BuzzStreet&backgroundColor=0b0d12" class="profile-img">', unsafe_allow_html=True)
-    st.markdown('<div class="profile-name">BuzzStreet Engine</div>', unsafe_allow_html=True)
-    st.markdown('<div class="profile-role">Phase III: Advanced NLP & AI Predictor</div>', unsafe_allow_html=True)
+    
+    # User Profile Badge & Logout Button
+    user_p = st.session_state.get("user_profile")
+    if user_p:
+        st.markdown(f"""
+        <div style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px;">
+            <div style="font-weight: 800; color: #ffffff; font-size: 1.05rem;">👤 {user_p['name']}</div>
+            <div style="font-size: 0.78rem; color: #38bdf8; font-weight: 600; margin-top: 2px;">🏢 {user_p['role']}</div>
+            <div style="font-size: 0.72rem; color: #94a3b8; margin-top: 2px;">🌐 {user_p['market_focus']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("🚪 Logout Account", use_container_width=True, key="sidebar_logout_btn"):
+            auth.logout_user()
+            st.rerun()
+            
     st.divider()
     
     st.markdown("### 🎙️ Voice Assistant & AI Bot")
