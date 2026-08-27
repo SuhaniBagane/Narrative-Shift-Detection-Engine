@@ -48,8 +48,12 @@ def get_system_health_status():
         market_api_status = "🟢 Online (Yahoo Finance)"
     except Exception:
         market_api_status = "🟡 Fallback Mode"
-        
-    # 5. News Ingestion Check
+
+    # 5. SMS Gateway Check
+    import auth
+    sms_status = "🟢 Online (Twilio Verify API)" if auth.is_twilio_configured() else "🟡 Sandbox Mode (Set TWILIO keys in .env)"
+    
+    # 6. News Ingestion Check
     news_summary = get_ingested_news_summary()
     news_api_status = "🟢 Online (Ingesting)"
     
@@ -65,6 +69,7 @@ def get_system_health_status():
             "NLP Pipeline Engine": nlp_status,
             "ML Sentiment Classifier": ml_status,
             "Market Data API": market_api_status,
+            "SMS Gateway API": sms_status,
             "News Ingestion API": news_api_status,
             "Forecast Engine": "🟢 Online",
             "Authentication Gate": "🟢 Online"
