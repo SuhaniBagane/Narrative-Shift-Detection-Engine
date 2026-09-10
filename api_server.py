@@ -96,7 +96,7 @@ class BuzzStreetAPIHandler(http.server.BaseHTTPRequestHandler):
 
 def run_api_server(port=PORT):
     with socketserver.TCPServer(("", port), BuzzStreetAPIHandler) as httpd:
-        print(f"🚀 BuzzStreet Production REST API Server running on http://localhost:{port}")
+        print(f"[+] BuzzStreet Production REST API Server running on http://localhost:{port}")
         httpd.serve_forever()
 
 if __name__ == "__main__":
