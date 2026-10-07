@@ -38,8 +38,13 @@ COUNTRY_CODES = [
 
 def is_twilio_configured():
     """Checks if real Twilio credentials exist in environment variables."""
-    return bool(TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN and TWILIO_VERIFY_SERVICE_SID and 
-                "your_" not in TWILIO_ACCOUNT_SID.lower())
+    load_dotenv(override=True)
+    sid = os.getenv("TWILIO_ACCOUNT_SID")
+    token = os.getenv("TWILIO_AUTH_TOKEN")
+    service = os.getenv("TWILIO_VERIFY_SERVICE_SID")
+    return bool(sid and token and service and 
+                "your_" not in str(sid).lower() and 
+                "placeholder" not in str(sid).lower())
 
 def mask_identifier(identifier):
     """Partially masks phone number or email for privacy."""
