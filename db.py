@@ -234,6 +234,29 @@ def save_user_profile(user_identifier, full_name, trader_role, market_focus, ale
     conn.commit()
     conn.close()
 
+def get_user_profile(user_identifier):
+    """Fetches user profile by phone or email identifier."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT up.full_name, up.trader_role, up.market_focus, up.alert_preferences, up.risk_preferences, u.created_at
+    FROM user_profiles up
+    JOIN users u ON up.user_id = u.id
+    WHERE u.phone_or_email = ?
+    """, (user_identifier,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            "name": row["full_name"],
+            "identifier": user_identifier,
+            "role": row["trader_role"],
+            "market_focus": row["market_focus"],
+            "alert_pref": row["alert_preferences"],
+            "joined_at": row["created_at"]
+        }
+    return None
+
 def record_narrative_event(prev_phase, curr_phase, old_comp, new_comp, shift_mag, agreement, conf, anomaly, assets):
     """Records a narrative shift transition event."""
     conn = get_connection()

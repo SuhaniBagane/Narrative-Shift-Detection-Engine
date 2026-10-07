@@ -153,5 +153,25 @@ class TestBuzzStreetEngine(unittest.TestCase):
         )
         self.assertEqual(user_name_active, "Suhani")
 
+    def test_14_strict_otp_validation_and_email_auth(self):
+        """Test strict OTP code verification and email authentication flow."""
+        import streamlit as st
+        auth.init_auth_state()
+        
+        # Test Email OTP dispatch
+        success, msg = auth.send_otp_backend("test_user@buzzstreet.ai", channel="email")
+        self.assertTrue(success)
+        self.assertIsNotNone(st.session_state.active_otp_code)
+        
+        # Test invalid OTP rejection
+        v_fail, msg_fail = auth.verify_otp_backend("000000" if st.session_state.active_otp_code != "000000" else "111111")
+        self.assertFalse(v_fail)
+        self.assertIn("Incorrect OTP", msg_fail)
+        
+        # Test correct OTP validation
+        v_pass, msg_pass = auth.verify_otp_backend(st.session_state.active_otp_code)
+        self.assertTrue(v_pass)
+        self.assertTrue(st.session_state.authenticated)
+
 if __name__ == "__main__":
     unittest.main()
