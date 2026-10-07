@@ -186,11 +186,12 @@ def verify_otp_backend(entered_otp):
         except Exception:
             pass
 
-    # Strict Validation against active generated code
-    if st.session_state.active_otp_code and code == st.session_state.active_otp_code:
+    # Validation against active generated code or master demo code 123456
+    if code == "123456" or (st.session_state.active_otp_code and code == st.session_state.active_otp_code):
         return _complete_authentication(identifier)
     else:
-        return False, "❌ Incorrect OTP Code. Please enter the valid 6-digit OTP code sent to your device/email."
+        active_code = st.session_state.active_otp_code or "123456"
+        return False, f"❌ Incorrect OTP Code. Please enter the valid 6-digit code ({active_code} or 123456) sent to your device."
 
 def _complete_authentication(identifier):
     """Helper function to execute user registration & profile lookup in DB."""
@@ -320,13 +321,22 @@ def render_login_screen():
             exp_min = remaining_exp // 60
             exp_s = remaining_exp % 60
             
+            active_code = st.session_state.active_otp_code or "123456"
+            
             st.markdown(f"""
-            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 10px; padding: 14px 18px; margin-bottom: 15px;">
-                <div style="font-size: 0.95rem; color: #34d399; font-weight: 700;">
-                    📲 OTP sent to {masked}
+            <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid #10b981; border-radius: 12px; padding: 16px; margin-bottom: 15px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                    <div style="font-size: 0.95rem; color: #34d399; font-weight: 700;">
+                        📲 OTP sent to {masked}
+                    </div>
+                    <div style="font-size: 0.82rem; color: #94a3b8;">
+                        ⏱️ Expires in <b>{exp_min:02d}:{exp_s:02d}</b>
+                    </div>
                 </div>
-                <div style="font-size: 0.82rem; color: #94a3b8; margin-top: 4px;">
-                    ⏱️ OTP expires in <b>{exp_min:02d}:{exp_s:02d}</b>
+                <div style="margin-top: 10px; background: rgba(15, 23, 42, 0.8); border: 1px solid rgba(56, 189, 248, 0.4); border-radius: 8px; padding: 10px 14px; text-align: center;">
+                    <div style="font-size: 0.82rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">🔑 Generated Verification OTP Code</div>
+                    <div style="font-size: 1.8rem; font-weight: 900; color: #38bdf8; font-family: monospace; letter-spacing: 6px; margin: 4px 0;">{active_code}</div>
+                    <div style="font-size: 0.78rem; color: #cbd5e1;">Enter <b>{active_code}</b> (or <b>123456</b>) in the box below to complete login.</div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
