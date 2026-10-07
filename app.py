@@ -376,7 +376,12 @@ st.markdown(f"<div style='font-size:0.85rem; color:#94a3b8; margin-bottom: 15px;
 # SCREEN 1: 🏠 HOME (CENTRAL APP LAUNCHER)
 # ==========================================
 if curr_screen == "🏠 Home":
-    st.markdown(f"## Good evening, {st.session_state.user_profile['name']} 👋")
+    user_name = (
+        st.session_state.user_profile.get("name", "Trader")
+        if isinstance(st.session_state.get("user_profile"), dict)
+        else (st.session_state.get("user_identifier") or "Trader")
+    )
+    st.markdown(f"## Good evening, {user_name} 👋")
     st.markdown("### 🌇 Today's BuzzStreet Daily Intelligence Brief")
     
     # Hero Global Market Mood
@@ -692,7 +697,10 @@ elif curr_screen == "📑 Reports":
 # ==========================================
 elif curr_screen == "👤 Profile":
     st.markdown("### 👤 User Profile & Workspace Settings")
-    st.json(st.session_state.user_profile)
+    if st.session_state.get("user_profile"):
+        st.json(st.session_state.user_profile)
+    else:
+        st.info("💡 Logged in as guest/trader. Sign in via OTP authentication to view full institutional credentials.")
 
 # ==========================================
 # SCREEN 14: 🛡️ ADMIN

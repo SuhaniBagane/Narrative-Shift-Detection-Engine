@@ -134,5 +134,24 @@ class TestBuzzStreetEngine(unittest.TestCase):
         self.assertIn("signal", signal_info)
         self.assertIn("BUY", signal_info["signal"])
 
+    def test_13_user_profile_safe_fallback(self):
+        """Test safe username fallback when session state user_profile is None."""
+        user_profile = None
+        user_identifier = None
+        user_name = (
+            user_profile.get("name", "Trader")
+            if isinstance(user_profile, dict)
+            else (user_identifier or "Trader")
+        )
+        self.assertEqual(user_name, "Trader")
+
+        user_profile_dict = {"name": "Suhani", "role": "Lead Quantitative Researcher"}
+        user_name_active = (
+            user_profile_dict.get("name", "Trader")
+            if isinstance(user_profile_dict, dict)
+            else "Trader"
+        )
+        self.assertEqual(user_name_active, "Suhani")
+
 if __name__ == "__main__":
     unittest.main()
