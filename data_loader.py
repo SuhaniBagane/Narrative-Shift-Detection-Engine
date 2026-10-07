@@ -156,6 +156,18 @@ def generate_headlines(bias="neutral", count=20):
         
     return headlines
 
+def sample_headlines_for_bias(bias_category="Neutral", count=10):
+    """
+    Samples news headlines based on the current market narrative bias category.
+    """
+    bias_map = {
+        "bullish": "bullish", "optimistic": "bullish",
+        "bearish": "bearish", "fear": "bearish",
+        "panic": "panic", "neutral": "neutral"
+    }
+    b = bias_map.get(str(bias_category).lower(), "neutral")
+    return generate_headlines(bias=b, count=count)
+
 def simulate_market_indices(sentiment_score, prev_nifty=22400.0, prev_sensex=73850.0):
     """
     Calculates the new values of Nifty 50 and Sensex based on the headline sentiment score.
