@@ -2365,12 +2365,14 @@ with tab_portfolio:
             st.markdown("**Your Active Watchlist Assets:**")
             w_rows = []
             for item in watchlist_items:
-                ast_n = item.get("asset", "N/A")
-                ast_price = paper_trading.BENCHMARK_ASSETS.get(ast_n, {}).get("price", 1000.0)
+                ast_n = item if isinstance(item, str) else (item.get("asset", "N/A") if isinstance(item, dict) else str(item))
+                ast_info = paper_trading.BENCHMARK_ASSETS.get(ast_n, {"price": 1000.0, "currency": "₹"})
+                ast_price = ast_info["price"]
+                ast_curr = ast_info.get("currency", "₹")
                 sig = paper_trading.get_model_trade_signal(ast_n, curr_composite, curr_phase, anomaly_score)
                 w_rows.append({
                     "Asset": ast_n,
-                    "Current Price": f"₹/{ast_price:,.2f}",
+                    "Current Price": f"{ast_curr}{ast_price:,.2f}",
                     "Sentiment": f"{curr_composite:+.3f}",
                     "Narrative": curr_phase,
                     "Model Signal": sig["signal"],
