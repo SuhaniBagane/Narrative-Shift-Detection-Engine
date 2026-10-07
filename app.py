@@ -785,12 +785,30 @@ with tab_live:
         key="desk_mode_select"
     )
     
-    desk_horizon = c_live3.slider("Forecast Days:", min_value=5, max_value=30, value=15, step=5, key="desk_horizon_slider")
+    horizon_options = {
+        "15 Days": 15,
+        "30 Days": 30,
+        "90 Days (3 Months)": 90,
+        "180 Days (6 Months)": 180,
+        "1 Year (365 Days)": 365,
+        "2 Years (730 Days)": 730,
+        "3 Years (1,095 Days)": 1095,
+        "5 Years (1,825 Days)": 1825
+    }
+    
+    selected_horizon_label = c_live3.selectbox(
+        "AI Forecast Horizon:",
+        options=list(horizon_options.keys()),
+        index=1,
+        key="desk_horizon_selectbox"
+    )
+    desk_horizon = horizon_options[selected_horizon_label]
     
     if desk_mode == "🔮 Live Desk + AI Future Prediction":
-        with st.spinner(f"Fetching real-time quotes for {selected_asset_name}..."):
+        fetch_period = "5y" if desk_horizon > 180 else "1y"
+        with st.spinner(f"Fetching real-world quotes ({fetch_period}) for {selected_asset_name}..."):
             try:
-                df_live = yf.download(yf_symbol, period="6mo", interval="1d")
+                df_live = yf.download(yf_symbol, period=fetch_period, interval="1d")
                 if isinstance(df_live.columns, pd.MultiIndex):
                     df_live.columns = df_live.columns.get_level_values(0)
             except Exception as e:
@@ -806,26 +824,26 @@ with tab_live:
             sma20 = df_live['Close'].rolling(window=20).mean()
             sma50 = df_live['Close'].rolling(window=50).mean()
             
-            # 2. Linear Regression & Sentiment Drift Forecast
-            lookback = min(40, n)
+            # 2. Linear Regression & Multi-Year CAGR Sentiment Drift Forecast
+            lookback = min(250 if desk_horizon > 180 else 60, n)
             y = np.array(prices[-lookback:])
             x = np.arange(lookback)
             slope, intercept = np.polyfit(x, y, 1)
             
             # Incorporate text sentiment index from current state
             curr_sentiment = st.session_state.market_history[-1]["sentiment"] if st.session_state.market_history else 0.0
-            sentiment_slope = curr_sentiment * (prices[-1] * 0.003)
-            blended_slope = (0.7 * slope) + (0.3 * sentiment_slope)
+            sentiment_slope = curr_sentiment * (prices[-1] * 0.002)
+            blended_slope = (0.75 * slope) + (0.25 * sentiment_slope)
             
             # Generate future prediction y values
             pred_steps = np.arange(1, desk_horizon + 1)
             pred_prices = prices[-1] + blended_slope * pred_steps
             
-            # Confidence bounds calculation
+            # Confidence bounds calculation (expanding uncertainty for long horizons)
             residuals = y - (slope * x + intercept)
             std_err = np.std(residuals) if len(residuals) > 1 else prices[-1] * 0.01
-            lower_bounds = pred_prices - 1.96 * std_err * np.sqrt(pred_steps)
-            upper_bounds = pred_prices + 1.96 * std_err * np.sqrt(pred_steps)
+            lower_bounds = np.maximum(prices[-1] * 0.1, pred_prices - 1.96 * std_err * np.sqrt(pred_steps * (lookback / 60)))
+            upper_bounds = pred_prices + 1.96 * std_err * np.sqrt(pred_steps * (lookback / 60))
             
             # Future Dates
             last_date = df_live.index[-1]
@@ -836,42 +854,52 @@ with tab_live:
                 if curr_date.weekday() < 5:
                     future_dates.append(curr_date.strftime('%Y-%m-%d'))
                     
-            # 3. Build Plotly Financial Candlestick + AI Prediction Overlay Chart
+            # 3. Build Plotly Financial Candlestick / Line + AI Prediction Overlay Chart
             fig_desk = go.Figure()
             
-            # Candlesticks
-            fig_desk.add_trace(go.Candlestick(
-                x=dates[-60:],
-                open=df_live['Open'].values[-60:],
-                high=df_live['High'].values[-60:],
-                low=df_live['Low'].values[-60:],
-                close=df_live['Close'].values[-60:],
-                name="Live Candlesticks",
-                increasing_line_color="#10b981",
-                decreasing_line_color="#ef4444"
-            ))
+            hist_points = min(250 if desk_horizon > 180 else 60, n)
+            
+            # Candlesticks for shorter windows or Line plot for multi-year
+            if desk_horizon <= 180:
+                fig_desk.add_trace(go.Candlestick(
+                    x=dates[-hist_points:],
+                    open=df_live['Open'].values[-hist_points:],
+                    high=df_live['High'].values[-hist_points:],
+                    low=df_live['Low'].values[-hist_points:],
+                    close=df_live['Close'].values[-hist_points:],
+                    name="Live Candlesticks",
+                    increasing_line_color="#10b981",
+                    decreasing_line_color="#ef4444"
+                ))
+            else:
+                fig_desk.add_trace(go.Scatter(
+                    x=dates[-hist_points:],
+                    y=prices[-hist_points:],
+                    name="Real World Historical Close",
+                    line=dict(color="#38bdf8", width=2.5)
+                ))
             
             # SMA 20 Line
             fig_desk.add_trace(go.Scatter(
-                x=dates[-60:],
-                y=sma20.values[-60:],
+                x=dates[-hist_points:],
+                y=sma20.values[-hist_points:],
                 name="SMA 20",
-                line=dict(color="#38bdf8", width=1.5)
+                line=dict(color="#38bdf8", width=1.5, dash="dot")
             ))
             
             # SMA 50 Line
             fig_desk.add_trace(go.Scatter(
-                x=dates[-60:],
-                y=sma50.values[-60:],
+                x=dates[-hist_points:],
+                y=sma50.values[-hist_points:],
                 name="SMA 50",
-                line=dict(color="#a78bfa", width=1.5)
+                line=dict(color="#a78bfa", width=1.5, dash="dot")
             ))
             
             # AI Future Prediction Line
             fig_desk.add_trace(go.Scatter(
                 x=[dates[-1]] + future_dates,
                 y=[prices[-1]] + pred_prices.tolist(),
-                name="AI Future Forecast",
+                name=f"AI Forecast ({selected_horizon_label})",
                 line=dict(color="#f59e0b", width=4, dash="dash")
             ))
             
@@ -908,25 +936,50 @@ with tab_live:
                 yref="paper",
                 text="📍 LIVE NOW",
                 showarrow=False,
-                font=dict(color="#38bdf8", size=12, family="Inter"),
-                xanchor="right"
+                font=dict(color="#38bdf8", size=12, family="monospace")
             )
-
             
             fig_desk.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font=dict(color="#94a3b8"),
-                margin=dict(l=20, r=20, t=10, b=20),
-                height=680,
                 xaxis_rangeslider_visible=False,
+                margin=dict(l=20, r=20, t=30, b=20),
+                height=520,
                 hovermode="x unified",
-                legend=dict(orientation="h", yanchor="bottom", y=1.01, xanchor="right", x=1)
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             fig_desk.update_xaxes(gridcolor="#1e293b")
             fig_desk.update_yaxes(gridcolor="#1e293b")
             
             st.plotly_chart(fig_desk, use_container_width=True)
+            
+            # 4. Multi-Year Forecast Metrics Summary Banner
+            target_price = float(pred_prices[-1])
+            tot_return_pct = ((target_price - prices[-1]) / prices[-1]) * 100
+            years_count = desk_horizon / 365.0
+            cagr = (((target_price / prices[-1]) ** (1.0 / max(0.1, years_count))) - 1) * 100 if years_count >= 0.5 else tot_return_pct
+            
+            st.markdown(f"""
+            <div style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(245, 158, 11, 0.3); border-radius: 12px; padding: 16px 20px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <div>
+                    <div style="font-size: 0.78rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Forecast Horizon</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: #f59e0b; margin-top: 2px;">{selected_horizon_label}</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.78rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Projected Target Price</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: #f8fafc; margin-top: 2px;">{prices[-1]:,.2f} ➔ <span style="color: {'#34d399' if tot_return_pct>=0 else '#ef4444'};">{target_price:,.2f}</span></div>
+                </div>
+                <div>
+                    <div style="font-size: 0.78rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">Total Return / CAGR</div>
+                    <div style="font-size: 1.25rem; font-weight: 800; color: {'#34d399' if tot_return_pct>=0 else '#ef4444'}; margin-top: 2px;">{tot_return_pct:+,.1f}% ({cagr:+,.1f}% / yr)</div>
+                </div>
+                <div>
+                    <div style="font-size: 0.78rem; text-transform: uppercase; color: #94a3b8; font-weight: 700;">95% Confidence Bounds</div>
+                    <div style="font-size: 1.15rem; font-weight: 700; color: #cbd5e1; margin-top: 2px;">{lower_bounds[-1]:,.2f} to {upper_bounds[-1]:,.2f}</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
             
             # Summary Intelligence Card
             curr_price = prices[-1]
@@ -1689,7 +1742,8 @@ with tab_forecast:
         "1 Month": "1mo",
         "3 Months": "3mo",
         "6 Months": "6mo",
-        "1 Year": "1y"
+        "1 Year": "1y",
+        "5 Years": "5y"
     }
     selected_period_label = col_t2.selectbox(
         "Historical Period:",
@@ -1698,9 +1752,29 @@ with tab_forecast:
     )
     period = period_options[selected_period_label]
     
-    forecast_horizon = col_t3.slider("Forecast Horizon (Days):", min_value=5, max_value=60, value=20, step=5)
+    f_horizon_opts = {
+        "15 Days": 15,
+        "30 Days": 30,
+        "90 Days (3M)": 90,
+        "180 Days (6M)": 180,
+        "1 Year (365D)": 365,
+        "2 Years (730D)": 730,
+        "3 Years (1,095D)": 1095,
+        "5 Years (1,825D)": 1825
+    }
     
-    with st.spinner("Fetching historical quotes..."):
+    sel_f_horizon_label = col_t3.selectbox(
+        "Forecast Horizon:",
+        options=list(f_horizon_opts.keys()),
+        index=1,
+        key="tab_forecast_horizon_select"
+    )
+    forecast_horizon = f_horizon_opts[sel_f_horizon_label]
+    
+    if forecast_horizon > 180 and period not in ["1y", "5y"]:
+        period = "5y"
+        
+    with st.spinner(f"Fetching real-world market quotes ({period})..."):
         try:
             df_hist = yf.download(ticker, period=period, interval="1d")
             if isinstance(df_hist.columns, pd.MultiIndex):
