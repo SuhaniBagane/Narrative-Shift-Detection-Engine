@@ -2,7 +2,8 @@
 BuzzStreet – tests/test_suite.py
 Automated Testing Suite.
 Tests authentication, OTP rules, NLP pipeline, sentiment models, composite score bounds,
-narrative phase thresholds, anomaly risk calculation, backtesting, paper trading, and database operations.
+narrative phase thresholds, anomaly risk calculation, backtesting, paper trading,
+trade impact simulation (BEFORE/AFTER), scenario matrix, and system health diagnostics.
 """
 
 import sys
@@ -20,7 +21,10 @@ from ml_model import model_instance
 from explainable_ai import explain_headline_sentiment
 from correlation_engine import compute_narrative_market_correlations
 from backtester import run_historical_backtest
-from paper_trading import execute_virtual_order, calculate_portfolio_summary
+from paper_trading import (
+    execute_virtual_order, calculate_portfolio_summary, 
+    simulate_trade_impact, get_portfolio_scenario_matrix, get_model_trade_signal
+)
 from system_health import get_system_health_status
 
 class TestBuzzStreetEngine(unittest.TestCase):
@@ -79,9 +83,10 @@ class TestBuzzStreetEngine(unittest.TestCase):
 
     def test_07_paper_trading_execution(self):
         """Test virtual paper trade order execution."""
-        user = "test_trader_unit"
-        success, msg = execute_virtual_order(user, "Nifty 50", "BUY", 10, 22000.0)
-        self.assertTrue(success)
+        import time
+        user = f"test_trader_unit_{int(time.time())}"
+        success, msg = execute_virtual_order(user, "Nifty 50", "BUY", 2, 22000.0)
+        self.assertTrue(success, f"Order failed with message: {msg}")
         
         summary = calculate_portfolio_summary(user)
         self.assertGreaterEqual(summary["portfolio_value"], 0)
@@ -91,6 +96,43 @@ class TestBuzzStreetEngine(unittest.TestCase):
         health = get_system_health_status()
         self.assertEqual(health["status_code"], 200)
         self.assertIn("Database Service", health["services"])
+
+    def test_09_trade_impact_simulation(self):
+        """Test BEFORE vs AFTER trade impact simulation metrics."""
+        user = "unit_impact_trader"
+        impact = simulate_trade_impact(user, "NVIDIA Corp.", "BUY", 5, 880.0)
+        self.assertTrue(impact["valid"])
+        self.assertIn("before", impact)
+        self.assertIn("after", impact)
+        self.assertEqual(impact["after"]["trades"], impact["before"]["trades"] + 1)
+        self.assertLess(impact["after"]["cash"], impact["before"]["cash"])
+
+    def test_10_trade_insufficient_cash_validation(self):
+        """Test validation error when buying with insufficient virtual cash."""
+        user = "unit_cash_trader"
+        # Try buying 1,000 shares of Bitcoin at $64,500 each (exceeds 100k cash)
+        success, msg = execute_virtual_order(user, "Bitcoin", "BUY", 1000, 64500.0)
+        self.assertFalse(success)
+        self.assertIn("Insufficient cash balance", msg)
+
+    def test_11_trade_unowned_share_sell_validation(self):
+        """Test validation error when selling unowned shares."""
+        user = "unit_sell_trader"
+        success, msg = execute_virtual_order(user, "Tesla Inc.", "SELL", 50, 175.0)
+        self.assertFalse(success)
+        self.assertIn("Cannot sell more shares than owned", msg)
+
+    def test_12_portfolio_scenario_matrix_and_model_signal(self):
+        """Test side-by-side Current vs Buy vs Sell scenarios and model signal generator."""
+        user = "unit_scenario_trader"
+        scenarios = get_portfolio_scenario_matrix(user, "Apple Inc.", 5, 182.5)
+        self.assertIn("current", scenarios)
+        self.assertIn("buy_scenario", scenarios)
+        self.assertIn("sell_scenario", scenarios)
+        
+        signal_info = get_model_trade_signal("Apple Inc.", +0.35, "Optimistic", 15)
+        self.assertIn("signal", signal_info)
+        self.assertIn("BUY", signal_info["signal"])
 
 if __name__ == "__main__":
     unittest.main()
