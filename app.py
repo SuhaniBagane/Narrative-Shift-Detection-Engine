@@ -2157,42 +2157,167 @@ with tab_intel:
 
 with tab_portfolio:
     st.markdown("### 💼 Portfolio Simulator & Watchlist Manager")
-    st.markdown("**PAPER TRADING / SIMULATION — NO REAL MONEY.** Trade virtual capital, set stop-loss orders, and monitor your watchlist.")
+    st.markdown("**PAPER TRADING / SIMULATION — NO REAL MONEY.** Trade virtual capital, simulate trade impacts, compare assets, and configure watchlist alerts.")
     
     user_id = st.session_state.get("user_profile", {}).get("identifier") or "default_trader"
     p_summary = paper_trading.calculate_portfolio_summary(user_id)
     
-    col_p1, col_p2, col_p3, col_p4 = st.columns(4)
+    # 1. Enhanced Portfolio Summary Cards
+    col_p1, col_p2, col_p3, col_p4, col_p5 = st.columns(5)
     with col_p1:
         st.metric("Virtual Portfolio Value", f"₹{p_summary['portfolio_value']:,.2f}")
     with col_p2:
         st.metric("Cash Balance", f"₹{p_summary['cash_balance']:,.2f}")
     with col_p3:
-        st.metric("Total Return", f"{p_summary['total_return_pct']:+.2f}%", delta_color="normal")
+        st.metric("Invested Capital", f"₹{p_summary['invested_capital']:,.2f}")
     with col_p4:
-        st.metric("Total Executed Trades", p_summary["trade_count"])
+        st.metric("Total Return", f"{p_summary['total_return_pct']:+.2f}%")
+    with col_p5:
+        st.metric("Expected Model Trades", p_summary["expected_trades_count"])
+        
+    st.markdown(f"""
+    <div style="background: rgba(15, 23, 42, 0.6); border: 1px solid #1e293b; border-radius: 10px; padding: 12px 18px; margin: 15px 0; display: flex; justify-content: space-between; flex-wrap: wrap; font-size: 0.85rem; color: #cbd5e1;">
+        <div><b>Today's P&L:</b> <span style="color: {'#34d399' if p_summary['today_pnl']>=0 else '#ef4444'}; font-weight: 700;">₹{p_summary['today_pnl']:+,.2f}</span></div>
+        <div><b>Weekly P&L:</b> <span style="color: {'#34d399' if p_summary['weekly_pnl']>=0 else '#ef4444'}; font-weight: 700;">₹{p_summary['weekly_pnl']:+,.2f}</span></div>
+        <div><b>Monthly P&L:</b> <span style="color: {'#34d399' if p_summary['monthly_pnl']>=0 else '#ef4444'}; font-weight: 700;">₹{p_summary['monthly_pnl']:+,.2f}</span></div>
+        <div><b>Unrealized P&L:</b> <span style="color: {'#34d399' if p_summary['unrealized_pnl']>=0 else '#ef4444'}; font-weight: 700;">₹{p_summary['unrealized_pnl']:+,.2f}</span></div>
+        <div><b>Realized P&L:</b> <span style="color: {'#34d399' if p_summary['realized_pnl']>=0 else '#ef4444'}; font-weight: 700;">₹{p_summary['realized_pnl']:+,.2f}</span></div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.divider()
+    
+    # 2. Company-by-Company Asset Comparison Table
+    st.markdown("#### 🏢 Company & Asset Comparison Matrix")
+    st.markdown("Real-time price, sentiment, narrative phase, risk score, model signal, and expected return comparison across supported benchmark assets.")
+    
+    comp_data = []
+    for asset_name, asset_info in paper_trading.BENCHMARK_ASSETS.items():
+        sig_info = paper_trading.get_model_trade_signal(asset_name, curr_composite, curr_phase, anomaly_score)
+        owned_q = p_summary["open_positions"].get(asset_name, 0.0)
+        alloc_pct = (owned_q * asset_info["price"] / p_summary["portfolio_value"] * 100) if p_summary["portfolio_value"] > 0 else 0.0
+        
+        comp_data.append({
+            "Asset": asset_name,
+            "Category": asset_info["category"],
+            "Price": f"{asset_info['currency']}{asset_info['price']:,.2f}",
+            "Sentiment": f"{curr_composite:+.3f}",
+            "Narrative": curr_phase,
+            "Risk Score": f"{anomaly_score}/100",
+            "BuzzScore": f"{min(98, max(40, int((curr_composite + 1) * 35 + 20)))}/100",
+            "Allocation": f"{alloc_pct:.1f}%",
+            "Model Signal": sig_info["signal"],
+            "Confidence": f"{sig_info['confidence']:.0f}%"
+        })
+    st.dataframe(pd.DataFrame(comp_data), use_container_width=True, height=280)
+    
+    st.divider()
+    
+    # 3. Interactive BUY / SELL Impact Simulator
+    st.markdown("#### 🧪 Trade Impact Simulator (BEFORE vs AFTER)")
+    st.markdown("Simulate the exact impact of a trade on Portfolio Value, Cash Balance, Total Return %, and Trade Count before executing.")
+    
+    col_sim1, col_sim2, col_sim3, col_sim4 = st.columns(4)
+    with col_sim1:
+        sim_asset = st.selectbox("Select Asset to Simulate:", list(paper_trading.BENCHMARK_ASSETS.keys()), key="sim_asset_select")
+    with col_sim2:
+        sim_action = st.selectbox("Action:", ["BUY", "SELL"], key="sim_action_select")
+    with col_sim3:
+        sim_qty = st.number_input("Simulated Quantity:", min_value=1, value=5, key="sim_qty_input")
+    with col_sim4:
+        sim_price = paper_trading.BENCHMARK_ASSETS[sim_asset]["price"]
+        st.markdown(f"**Execution Price:** `{paper_trading.BENCHMARK_ASSETS[sim_asset]['currency']}{sim_price:,.2f}`")
+        
+    sim_res = paper_trading.simulate_trade_impact(user_id, sim_asset, sim_action, sim_qty, sim_price)
+    
+    if not sim_res["valid"]:
+        st.warning(f"⚠️ Simulation Note: {sim_res['message']}")
+    else:
+        st.markdown("##### 📊 BEFORE vs AFTER Impact Summary")
+        impact_df = pd.DataFrame([
+            {"Metric": "Virtual Portfolio Value", "BEFORE": f"₹{sim_res['before']['value']:,.2f}", "AFTER": f"₹{sim_res['after']['value']:,.2f}", "Change": f"₹{sim_res['diff']['value']:+,.2f}"},
+            {"Metric": "Cash Balance", "BEFORE": f"₹{sim_res['before']['cash']:,.2f}", "AFTER": f"₹{sim_res['after']['cash']:,.2f}", "Change": f"₹{sim_res['diff']['cash']:+,.2f}"},
+            {"Metric": "Total Return (%)", "BEFORE": f"{sim_res['before']['return']:+.2f}%", "AFTER": f"{sim_res['after']['return']:+.2f}%", "Change": f"{sim_res['diff']['return']:+.2f}%"},
+            {"Metric": "Expected / Simulated Trades", "BEFORE": sim_res['before']['trades'], "AFTER": sim_res['after']['trades'], "Change": "+1"}
+        ])
+        st.dataframe(impact_df, use_container_width=True)
         
     st.divider()
     
-    # Virtual Order Placement Form
-    st.markdown("#### 📈 Place Virtual Paper Trade Order")
+    # 4. Side-by-Side 3-Scenario Matrix (CURRENT vs BUY vs SELL)
+    st.markdown("#### 🎯 3-Scenario Comparison Matrix (CURRENT vs BUY vs SELL)")
+    scenarios = paper_trading.get_portfolio_scenario_matrix(user_id, sim_asset, sim_qty, sim_price)
+    
+    scen_df = pd.DataFrame([
+        {"Metric": "Virtual Portfolio Value", "CURRENT": f"₹{scenarios['current']['portfolio_value']:,.2f}", "BUY Scenario": f"₹{scenarios['buy_scenario']['portfolio_value']:,.2f}", "SELL Scenario": f"₹{scenarios['sell_scenario']['portfolio_value']:,.2f}"},
+        {"Metric": "Cash Balance", "CURRENT": f"₹{scenarios['current']['cash']:,.2f}", "BUY Scenario": f"₹{scenarios['buy_scenario']['cash']:,.2f}", "SELL Scenario": f"₹{scenarios['sell_scenario']['cash']:,.2f}"},
+        {"Metric": "Total Return (%)", "CURRENT": f"{scenarios['current']['total_return']:+.2f}%", "BUY Scenario": f"{scenarios['buy_scenario']['total_return']:+.2f}%", "SELL Scenario": f"{scenarios['sell_scenario']['total_return']:+.2f}%"},
+        {"Metric": "Risk Score (/100)", "CURRENT": scenarios['current']['risk'], "BUY Scenario": scenarios['buy_scenario']['risk'], "SELL Scenario": scenarios['sell_scenario']['risk']},
+        {"Metric": "Expected Trades Count", "CURRENT": scenarios['current']['trades'], "BUY Scenario": scenarios['buy_scenario']['trades'], "SELL Scenario": scenarios['sell_scenario']['trades']}
+    ])
+    st.dataframe(scen_df, use_container_width=True)
+    
+    st.divider()
+    
+    # 5. Virtual Order Placement & Execution
+    st.markdown("#### 🚀 Execute Virtual Paper Trade Order")
     col_o1, col_o2, col_o3, col_o4 = st.columns(4)
     with col_o1:
-        order_asset = st.selectbox("Asset:", ["Nifty 50", "BSE Sensex", "Reliance Industries", "Apple Inc.", "Tesla Inc.", "NVIDIA Corp."], key="pt_asset")
+        order_asset = st.selectbox("Asset to Trade:", list(paper_trading.BENCHMARK_ASSETS.keys()), key="pt_asset_exec")
     with col_o2:
-        order_action = st.selectbox("Action:", ["BUY", "SELL"], key="pt_action")
+        order_action = st.selectbox("Order Type:", ["BUY", "SELL"], key="pt_action_exec")
     with col_o3:
-        order_qty = st.number_input("Quantity:", min_value=1, value=10, key="pt_qty")
+        order_qty = st.number_input("Order Quantity:", min_value=1, value=10, key="pt_qty_exec")
     with col_o4:
-        order_price = st.number_input("Execution Price (₹/$):", min_value=1.0, value=22420.0, key="pt_price")
+        order_price = st.number_input("Execution Price (₹/$):", min_value=1.0, value=float(paper_trading.BENCHMARK_ASSETS[order_asset]["price"]), key="pt_price_exec")
         
-    if st.button("🚀 Execute Paper Trade", type="primary", key="btn_exec_pt"):
+    if st.button("🚀 Confirm Paper Trade Order", type="primary", key="btn_exec_pt_confirm"):
         success, msg = paper_trading.execute_virtual_order(user_id, order_asset, order_action, order_qty, order_price)
         if success:
             st.success(msg)
             st.rerun()
         else:
             st.error(msg)
+            
+    st.divider()
+    
+    # 6. Watchlist Manager & Custom Alerts
+    st.markdown("#### ⭐ Watchlist Manager & Custom Alerts")
+    watchlist_items = db.get_user_watchlist(user_id)
+    
+    col_w1, col_w2 = st.columns([2, 1])
+    with col_w1:
+        if watchlist_items:
+            st.markdown("**Your Active Watchlist Assets:**")
+            w_rows = []
+            for item in watchlist_items:
+                ast_n = item.get("asset", "N/A")
+                ast_price = paper_trading.BENCHMARK_ASSETS.get(ast_n, {}).get("price", 1000.0)
+                sig = paper_trading.get_model_trade_signal(ast_n, curr_composite, curr_phase, anomaly_score)
+                w_rows.append({
+                    "Asset": ast_n,
+                    "Current Price": f"₹/{ast_price:,.2f}",
+                    "Sentiment": f"{curr_composite:+.3f}",
+                    "Narrative": curr_phase,
+                    "Model Signal": sig["signal"],
+                    "Confidence": f"{sig['confidence']:.0f}%"
+                })
+            st.dataframe(pd.DataFrame(w_rows), use_container_width=True)
+        else:
+            st.info("Watchlist is currently empty. Add assets on the right to track real-time sentiment and narrative shifts.")
+            
+    with col_w2:
+        st.markdown("**Add Asset to Watchlist:**")
+        add_ast = st.selectbox("Select Asset:", list(paper_trading.BENCHMARK_ASSETS.keys()), key="wl_add_ast")
+        if st.button("➕ Add to Watchlist", key="btn_add_wl", use_container_width=True):
+            db.add_watchlist_asset(user_id, add_ast)
+            st.success(f"Added {add_ast} to Watchlist!")
+            st.rerun()
+            
+        st.markdown("**Configure Custom Alerts:**")
+        st.checkbox("☑ Alert on Narrative Shift (e.g. Neutral → Fear)", value=True, key="chk_alt_shift")
+        st.checkbox("☑ Alert on Sentiment Jump (> 0.30)", value=True, key="chk_alt_sent")
+        st.checkbox("☑ Alert on High Anomaly Risk (> 70)", value=True, key="chk_alt_risk")
 
 with tab_dataset:
     st.markdown("### 📂 Ingested Kaggle Corpus & Dataset Provenance")

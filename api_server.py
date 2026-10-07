@@ -49,8 +49,15 @@ class BuzzStreetAPIHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/narrative-events":
             events = db.get_narrative_events(limit=20)
             self._send_json_response({"status": "success", "count": len(events), "events": events})
+        elif path == "/api/portfolio":
+            import paper_trading
+            summary = paper_trading.calculate_portfolio_summary("api_guest_user")
+            self._send_json_response({"status": "success", "portfolio": summary})
+        elif path == "/api/watchlist":
+            watchlist = db.get_user_watchlist("api_guest_user")
+            self._send_json_response({"status": "success", "count": len(watchlist), "watchlist": watchlist})
         else:
-            self._send_json_response({"error": "Endpoint not found", "available_endpoints": ["/api/health", "/api/narrative-events", "/api/analyze-headline"]}, status_code=404)
+            self._send_json_response({"error": "Endpoint not found", "available_endpoints": ["/api/health", "/api/narrative-events", "/api/portfolio", "/api/watchlist", "/api/analyze-headline"]}, status_code=404)
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
